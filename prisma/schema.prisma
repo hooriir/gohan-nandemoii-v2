@@ -1,0 +1,67 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// 1. ユーザーテーブル
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  name      String?
+  password  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  dishes   Dish[]
+  showLogs DishShowLog[]
+}
+
+// 2. dishesテーブル（ごはん）
+model Dish {
+  id        String   @id @default(cuid())
+  userId    String   // 登録したユーザーのID
+  name      String   // ごはん名
+  imageUrl  String?  // ごはん画像（Supabase StorageのURL等を想定して省略可能に）
+  
+  // リレーションの定義
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tags      Tag[]         // このごはんに紐づくキーワード（多対多）
+  showLogs  DishShowLog[] // このごはんの表示履歴（一対多）
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// 3. tagsテーブル（キーワード）
+model Tag {
+  id        String   @id @default(cuid())
+  name      String   @unique // タグ名（「さっぱり」「肉」などが重複しないようuniqueに）
+  
+  // リレーションの定義
+  dishes    Dish[]   // このタグを持つごはん一覧（多対多）
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// 4. dish_show_logsテーブル（ごはん表示履歴）
+model DishShowLog {
+  id        Int      @id @default(autoincrement())
+  userId    String   
+  dishId    String   
+  keyword   String?  
+
+  // リレーションの定義
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dish      Dish     @relation(fields: [dishId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+}
