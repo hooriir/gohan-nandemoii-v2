@@ -27,8 +27,6 @@ function HomePageContent() {
   const [userId, setUserId] = useState<string | null>(null);
   const [authChecking, setAuthChecking] = useState(true);
   const [keyword, setKeyword] = useState("");
-  const [suggestionKeywords, setSuggestionKeywords] = useState<string[]>([]);
-
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<RecommendResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -43,25 +41,6 @@ function HomePageContent() {
 
   const isLoggedIn = !!userId;
   const isTimeout = searchParams.get("reason") === "timeout";
-
-  useEffect(() => {
-    if (!userId) return;
-
-    async function fetchSuggestions() {
-      try {
-        const response = await fetch("/api/tags");
-        if (response.ok) {
-          const data = await response.json();
-          const names = data.map((item: { name: string }) => item.name);
-          setSuggestionKeywords(names);
-        }
-      } catch (err) {
-        console.error("候補の取得に失敗しました:", err);
-      }
-    }
-
-    fetchSuggestions();
-  }, [userId]);
 
   useEffect(() => {
     const supabase = createClient();
@@ -336,24 +315,6 @@ function HomePageContent() {
               onChange={(e) => setKeyword(e.target.value)}
               className="w-full px-4 py-4 rounded-2xl text-gray-800 bg-white shadow-md focus:outline-none text-center text-lg font-bold placeholder-gray-400"
             />
-
-            {suggestionKeywords.length > 0 && (
-              <div className="flex flex-wrap gap-2 justify-center max-h-32 overflow-y-auto p-1">
-                {suggestionKeywords.map((item, index) => (
-                  <button
-                    key={index}
-                    type="button"
-                    onClick={() => {
-                      setKeyword(item);
-                    }}
-                    className="bg-white/20 hover:bg-white/30 active:scale-95 text-white text-xs font-bold px-3 py-1.5 rounded-full border border-white/40 transition-all shadow-sm"
-                  >
-                    #{item}
-                  </button>
-                ))}
-              </div>
-            )}
-
             <button 
               type="submit"
               className="w-full py-4 bg-[#e60012] hover:bg-[#c4000f] text-white font-black text-xl rounded-2xl shadow-lg transition-transform active:scale-95"
@@ -489,28 +450,6 @@ function HomePageContent() {
                 disabled={loading}
                 className="w-full px-4 py-3 rounded-xl text-gray-800 bg-gray-50 border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#53cbfb] placeholder-gray-400 font-bold"
               />
-
-              {/* ポップアップ内：登録されているタグ・メニューのピル型ボタン一覧 */}
-              {suggestionKeywords.length > 0 && (
-                <div className="flex flex-wrap gap-1.5 justify-center max-h-28 overflow-y-auto p-1 bg-gray-50/50 rounded-xl border border-gray-100">
-                  {suggestionKeywords.map((item, index) => (
-                    <button
-                      key={index}
-                      type="button"
-                      disabled={loading}
-                      onClick={() => {
-                        setKeyword(item);
-                        // もしここでもボタンを押した瞬間にそのまま検索させたい場合は、
-                        // handleSearch(item); をここに入れることも可能です！
-                      }}
-                      className="bg-white hover:bg-slate-100 active:scale-95 text-slate-700 text-xs font-bold px-2.5 py-1 rounded-full border border-gray-200 transition-all shadow-xs disabled:opacity-50"
-                    >
-                      #{item}
-                    </button>
-                  ))}
-                </div>
-              )}
-
               <button 
                 type="submit"
                 disabled={loading}
