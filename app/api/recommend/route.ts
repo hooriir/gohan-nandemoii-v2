@@ -106,7 +106,7 @@ export async function POST(request: Request) {
         if (matchedAll.length > 0) {
           targetDishes = matchedAll;
         } else {
-          targetDishes = userDishes;
+          targetDishes = userDishes.length > 0 ? userDishes : availableDishes;
         }
       }
     }
@@ -126,38 +126,9 @@ export async function POST(request: Request) {
       `本日は「${cleanKeyword}」に合せて、${selectedDish.name}をチョイスしました。楽しい食卓にしてくださいね！`,
       `「${cleanKeyword}」というリクエストにお応えして、今日は${selectedDish.name}で決まりです！`,
     ];
-    // 初期値として、その中からランダムに1つ選んでセットしておく
     let reasonText = fallbackTemplates[Math.floor(Math.random() * fallbackTemplates.length)];
 
-    try {
-      const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: prompt,
-        config: {
-          temperature: 0.9, // 創造性を高めに
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: "OBJECT",
-            properties: {
-              reason: { type: "STRING", description: "選んだ理由" },
-            },
-            required: ["reason"],
-          },
-        },
-      });
-
-      let rawText = response.text || "{}";
-      rawText = rawText.replace(/```json/g, "").replace(/```/g, "").trim();
-      const parsed = JSON.parse(rawText);
-      if (parsed.reason) {
-        reasonText = parsed.reason;
-        isAiSuccess = true;
-      }
-    } catch (aiError) {
-      console.warn("Gemini APIの理由生成でエラーが発生しましたが継続します:", aiError);
-      // ここでもしエラーになっても、上でランダムに選ばれたフォールバック文言が使われます
-    }
-    
+    // ★ API呼び出しは1回にまとめました
     try {
       const response = await ai.models.generateContent({
         model: "gemini-2.5-flash",
