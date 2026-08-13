@@ -231,7 +231,7 @@ function HomePageContent() {
   // ==========================================
   if (!isLoggedIn) {
     return (
-      <div className="bg-[#53cbfb] min-h-screen flex items-center justify-center p-4">
+      <div className="bg-[#53cbfb] min-h-screen flex flex-col items-center justify-center px-4">
         <div className="bg-white p-8 sm:p-10 rounded-2xl shadow-xl w-full max-w-[400px] text-center">
 
           <h1 className="flex justify-center mb-2">
@@ -321,7 +321,7 @@ function HomePageContent() {
   // ログイン中の通常画面
   // ==========================================
   return (
-    <div className="bg-[#53cbfb] min-h-screen flex flex-col items-center p-4 text-white font-sans select-none justify-start pb-20">
+    <div className="bg-[#53cbfb] min-h-screen flex flex-col items-center justify-center px-4 text-white font-sans select-none justify-start pb-20">
       <Header />
 
       {!hasSearched ? (
