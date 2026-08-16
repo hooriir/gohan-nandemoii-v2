@@ -32,7 +32,6 @@ export async function POST(request: Request) {
     }
 
     const userId = user.id;
-
     const body = await request.json();
     const { keyword } = body;
 
@@ -42,6 +41,8 @@ export async function POST(request: Request) {
 
     const displayName =
       user.user_metadata?.name || user.email?.split("@")[0] || "ユーザー";
+
+    // ユーザー情報のUpsert
     await prisma.user.upsert({
       where: { id: userId },
       update: { email: user.email || "" },
@@ -53,6 +54,7 @@ export async function POST(request: Request) {
       },
     });
 
+    // 過去1週間で表示された料理ログを取得
     const recentLogs = await prisma.dishShowLog.findMany({
       where: {
         userId: userId,
@@ -62,20 +64,24 @@ export async function POST(request: Request) {
       orderBy: { createdAt: "desc" },
     });
 
-    const excludedDishIds = recentLogs.map((log) => log.dishId);
-    
-    const userDishes = await prisma.dish.findMany({
+    const excludedDishIds = recentLogs.map((log: { dishId: string }) => log.dishId);
+
+    // ユーザーの全料理を取得
+    const userDishes = (await prisma.dish.findMany({
       where: { userId: userId },
       include: { tags: true },
-    }) as DishWithTags[];
+    })) as DishWithTags[];
 
     if (userDishes.length === 0) {
       return new Response(
-        JSON.stringify({ error: "登録されているメニューがありません。先にメニューを追加してください。" }),
+        JSON.stringify({
+          error: "登録されているメニューがありません。先にメニューを追加してください。",
+        }),
         { status: 400, headers: { "Content-Type": "application/json" } }
       );
     }
 
+    // 除外IDに含まれない料理を抽出
     const availableDishes = userDishes.filter(
       (dish) => !excludedDishIds.includes(dish.id)
     );
@@ -91,9 +97,10 @@ export async function POST(request: Request) {
         .filter((k: string) => k.length > 0);
 
       const filterFn = (dish: DishWithTags) =>
-        searchKeywords.some((kw: string) =>
-          dish.name.includes(kw) ||
-          dish.tags.some((t: Tag) => t.name.includes(kw))
+        searchKeywords.some(
+          (kw: string) =>
+            dish.name.includes(kw) ||
+            dish.tags.some((t: Tag) => t.name.includes(kw))
         );
 
       const matchedAvailable = availableDishes.filter(filterFn);
@@ -102,7 +109,7 @@ export async function POST(request: Request) {
         targetDishes = matchedAvailable;
       } else {
         const matchedAll = userDishes.filter(filterFn);
-        
+
         if (matchedAll.length > 0) {
           targetDishes = matchedAll;
         } else {
@@ -111,7 +118,8 @@ export async function POST(request: Request) {
       }
     }
 
-    const selectedDish = targetDishes[Math.floor(Math.random() * targetDishes.length)];
+    const selectedDish =
+      targetDishes[Math.floor(Math.random() * targetDishes.length)];
 
     const prompt = `あなたは親しみやすくておしゃべりな専属シェフアシスタントです。
 ユーザーの今の気分・要望: 「${cleanKeyword}」
@@ -123,7 +131,7 @@ export async function POST(request: Request) {
     let isAiSuccess = false;
     const fallbackTemplates = [
       `「${cleanKeyword}」の気分なら、やっぱり${selectedDish.name}が最高ですね！美味しく食べて元気を出しましょう！`,
-      `本日は「${cleanKeyword}」に合せて、${selectedDish.name}をチョイスしました。楽しい食卓にしてくださいね！`,
+      `本日は「${cleanKeyword}」に合わせて、${selectedDish.name}をチョイスしました。楽しい食卓にしてくださいね！`,
       `「${cleanKeyword}」というリクエストにお応えして、今日は${selectedDish.name}で決まりです！`,
     ];
     let reasonText = fallbackTemplates[Math.floor(Math.random() * fallbackTemplates.length)];
@@ -146,17 +154,21 @@ export async function POST(request: Request) {
         },
       });
 
-      let rawText = response.text || "{}";
-      rawText = rawText.replace(/```json/g, "").replace(/```/g, "").trim();
-      const parsed = JSON.parse(rawText);
-      if (parsed.reason) {
-        reasonText = parsed.reason;
-        isAiSuccess = true;
+      if (response.text) {
+        const parsed = JSON.parse(response.text);
+        if (parsed.reason) {
+          reasonText = parsed.reason;
+          isAiSuccess = true;
+        }
       }
     } catch (aiError) {
-      console.warn("Gemini APIの理由生成でエラーが発生しましたが継続します:", aiError);
+      console.warn(
+        "Gemini APIの理由生成でエラーが発生しましたが継続します:",
+        aiError
+      );
     }
 
+    // 表示ログの作成
     await prisma.dishShowLog.create({
       data: {
         userId: userId,
@@ -177,7 +189,6 @@ export async function POST(request: Request) {
       }),
       { headers: { "Content-Type": "application/json" } }
     );
-
   } catch (error) {
     console.error("Recommend API Error:", error);
     return new Response(
