@@ -4,6 +4,12 @@ import { prisma } from "@/lib/prisma";
 import { createClient } from "@/utils/supabase/server";
 import Link from "next/link";
 import Button from "@/components/Button";
+import { z } from "zod";
+
+const updateDishSchema = z.object({
+  name: z.string().min(1, "ごはん名は必須です。").max(100, "ごはん名は100文字以内で入力してください。"),
+  tagsInput: z.string().optional(),
+});
 
 interface EditPageProps {
   params: Promise<{ id: string }>;
@@ -39,7 +45,7 @@ export default async function EditMenuPage({ params }: EditPageProps) {
     notFound();
   }
 
-  const tagsString = dish.tags.map((t) => t.name).join(" ");
+  const tagsString = dish.tags.map((t: { name: string }) => t.name).join(" ");
 
   async function updateDish(formData: FormData) {
     "use server";
@@ -70,11 +76,20 @@ export default async function EditMenuPage({ params }: EditPageProps) {
       redirect("/menus");
     }
 
-    const name = formData.get("name") as string;
-    const tagsInput = formData.get("tagsInput") as string;
-    const imageFile = formData.get("image") as File;
+    const rawData = {
+      name: formData.get("name"),
+      tagsInput: formData.get("tagsInput"),
+    };
 
-    if (!name) return;
+    const parsedResult = updateDishSchema.safeParse(rawData);
+
+    if (!parsedResult.success) {
+      console.error("バリデーションエラー:", parsedResult.error.format());
+      return;
+    }
+
+    const { name, tagsInput } = parsedResult.data;
+    const imageFile = formData.get("image") as File;
 
     let imageUrl = existingDish.imageUrl;
 

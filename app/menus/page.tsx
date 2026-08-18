@@ -40,7 +40,6 @@ export default async function MenusPage() {
       <Header />
       
       <div className="w-full max-w-[900px] flex flex-row gap-6 items-start justify-center">
-        {/* <Sidebar /> */}
 
         <div className="flex-1 bg-white rounded-3xl shadow-xl p-6 sm:p-10 border border-slate-100 w-full min-w-0">
           <h2 className="text-[#54C7F3] text-center text-2xl font-black mb-8 tracking-wider">

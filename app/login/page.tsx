@@ -49,8 +49,6 @@ function LoginForm() {
         return;
       }
 
-      console.log("ログイン成功！", data);
-
       if (data.session) {
         await supabase.auth.setSession(data.session);
       }

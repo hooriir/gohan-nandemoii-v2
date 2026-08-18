@@ -42,7 +42,6 @@ export async function POST(request: Request) {
     const displayName =
       user.user_metadata?.name || user.email?.split("@")[0] || "ユーザー";
 
-    // ユーザー情報のUpsert
     await prisma.user.upsert({
       where: { id: userId },
       update: { email: user.email || "" },
@@ -54,7 +53,6 @@ export async function POST(request: Request) {
       },
     });
 
-    // 過去1週間で表示された料理ログを取得
     const recentLogs = await prisma.dishShowLog.findMany({
       where: {
         userId: userId,
@@ -66,11 +64,10 @@ export async function POST(request: Request) {
 
     const excludedDishIds = recentLogs.map((log: { dishId: string }) => log.dishId);
 
-    // ユーザーの全料理を取得
     const userDishes = (await prisma.dish.findMany({
       where: { userId: userId },
       include: { tags: true },
-    })) as DishWithTags[];
+    })) as unknown as DishWithTags[];
 
     if (userDishes.length === 0) {
       return new Response(
@@ -81,7 +78,6 @@ export async function POST(request: Request) {
       );
     }
 
-    // 除外IDに含まれない料理を抽出
     const availableDishes = userDishes.filter(
       (dish) => !excludedDishIds.includes(dish.id)
     );
@@ -97,10 +93,9 @@ export async function POST(request: Request) {
         .filter((k: string) => k.length > 0);
 
       const filterFn = (dish: DishWithTags) =>
-        searchKeywords.some(
-          (kw: string) =>
-            dish.name.includes(kw) ||
-            dish.tags.some((t: Tag) => t.name.includes(kw))
+        searchKeywords.some((kw: string) =>
+          dish.name.includes(kw) ||
+          dish.tags.some((t: Tag) => t.name.includes(kw))
         );
 
       const matchedAvailable = availableDishes.filter(filterFn);
@@ -126,7 +121,8 @@ export async function POST(request: Request) {
 今日選ばれた料理: 「${selectedDish.name}」
 
 この料理がユーザーの要望や今の気分にどうしてぴったりなのか、まるで友達や家族に話しかけるように、温かみのあるトーンで120〜150文字程度の少し長めの文章で「おすすめの理由」を教えてください。
-毎回、違った切り口やユーモアを交えて、新鮮味のあるコメントにしてください。`;
+毎回、違った切り口やユーモアを交えて、新鮮味のあるコメントにしてください。
+※必ず以下のJSON形式のみで出力してください: {"reason": "ここに理由を書く"}`;
 
     let isAiSuccess = false;
     const fallbackTemplates = [
@@ -139,18 +135,11 @@ export async function POST(request: Request) {
     // ★ API呼び出しは1回にまとめました
     try {
       const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: "gemini-2.0-flash",
         contents: prompt,
         config: {
           temperature: 0.9,
           responseMimeType: "application/json",
-          responseSchema: {
-            type: "OBJECT",
-            properties: {
-              reason: { type: "STRING", description: "選んだ理由" },
-            },
-            required: ["reason"],
-          },
         },
       });
 
@@ -168,7 +157,6 @@ export async function POST(request: Request) {
       );
     }
 
-    // 表示ログの作成
     await prisma.dishShowLog.create({
       data: {
         userId: userId,
