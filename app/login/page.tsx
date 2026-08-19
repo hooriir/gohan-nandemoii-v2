@@ -63,8 +63,6 @@ function LoginForm() {
     }
   };
 
-  
-
   return (
     <div className="bg-brand-bg min-h-screen flex items-center justify-center p-4">
       <div className="bg-white p-10 rounded-2xl shadow-xl w-full max-w-[400px] text-center">
