@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { createClient } from "@/utils/supabase/server";
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, ThinkingLevel, Type } from "@google/genai";
 
 const ai = new GoogleGenAI({});
 
@@ -121,8 +121,7 @@ export async function POST(request: Request) {
 今日選ばれた料理: 「${selectedDish.name}」
 
 この料理がユーザーの要望や今の気分にどうしてぴったりなのか、まるで友達や家族に話しかけるように、温かみのあるトーンで120〜150文字程度の少し長めの文章で「おすすめの理由」を教えてください。
-毎回、違った切り口やユーモアを交えて、新鮮味のあるコメントにしてください。
-※必ず以下のJSON形式のみで出力してください: {"reason": "ここに理由を書く"}`;
+毎回、違った切り口やユーモアを交えて、新鮮味のあるコメントにしてください。`;
 
     let isAiSuccess = false;
     const fallbackTemplates = [
@@ -135,11 +134,18 @@ export async function POST(request: Request) {
     // ★ API呼び出しは1回にまとめました
     try {
       const response = await ai.models.generateContent({
-        model: "gemini-2.0-flash",
+        model: "gemini-3.6-flash",
         contents: prompt,
         config: {
-          temperature: 0.9,
           responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              reason: { type: Type.STRING },
+            },
+            required: ["reason"],
+          },
+          thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
         },
       });
 
@@ -151,10 +157,7 @@ export async function POST(request: Request) {
         }
       }
     } catch (aiError) {
-      console.warn(
-        "Gemini APIの理由生成でエラーが発生しましたが継続します:",
-        aiError
-      );
+      console.error("Gemini APIの理由生成に失敗しました:", aiError);
     }
 
     await prisma.dishShowLog.create({
