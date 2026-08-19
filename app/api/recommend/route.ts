@@ -1,21 +1,11 @@
 import { prisma } from "@/lib/prisma";
 import { createClient } from "@/utils/supabase/server";
 import { GoogleGenAI, ThinkingLevel, Type } from "@google/genai";
+import type { Prisma } from "@prisma/client";
 
 const ai = new GoogleGenAI({});
 
-interface Tag {
-  id: string;
-  name: string;
-}
-
-interface DishWithTags {
-  id: string;
-  name: string;
-  imageUrl: string | null;
-  userId: string;
-  tags: Tag[];
-}
+type DishWithTags = Prisma.DishGetPayload<{ include: { tags: true } }>;
 
 export async function POST(request: Request) {
   try {
@@ -62,12 +52,12 @@ export async function POST(request: Request) {
       orderBy: { createdAt: "desc" },
     });
 
-    const excludedDishIds = recentLogs.map((log: { dishId: string }) => log.dishId);
+    const excludedDishIds = recentLogs.map((log) => log.dishId);
 
-    const userDishes = (await prisma.dish.findMany({
+    const userDishes = await prisma.dish.findMany({
       where: { userId: userId },
       include: { tags: true },
-    })) as unknown as DishWithTags[];
+    });
 
     if (userDishes.length === 0) {
       return new Response(
@@ -95,7 +85,7 @@ export async function POST(request: Request) {
       const filterFn = (dish: DishWithTags) =>
         searchKeywords.some((kw: string) =>
           dish.name.includes(kw) ||
-          dish.tags.some((t: Tag) => t.name.includes(kw))
+          dish.tags.some((t) => t.name.includes(kw))
         );
 
       const matchedAvailable = availableDishes.filter(filterFn);

@@ -23,7 +23,6 @@ export default function DeleteButton({
           onOptimisticDelete(dishId);
         }
 
-        // ▼▼▼ FormDataを使わず、dishId（文字列）を直接渡す ▼▼▼
         await deleteDish(dishId);
       } catch (error) {
         console.error("削除エラー:", error);

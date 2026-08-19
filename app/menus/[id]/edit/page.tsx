@@ -45,7 +45,7 @@ export default async function EditMenuPage({ params }: EditPageProps) {
     notFound();
   }
 
-  const tagsString = dish.tags.map((t: { name: string }) => t.name).join(" ");
+  const tagsString = dish.tags.map((t) => t.name).join(" ");
 
   async function updateDish(formData: FormData) {
     "use server";

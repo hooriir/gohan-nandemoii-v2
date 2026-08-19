@@ -35,12 +35,16 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  // ★ 改善ポイント: ネットワーク通信を伴う getUser() ではなく getSession() に変更
-  // これによりミドルウェアでの API 通信待ちがなくなり、画面遷移が爆速・滑らかになります。
+  // getUser() は毎回 Supabase への通信が入り全ページの遷移が遅くなるため、
+  // ミドルウェアでは cookie 読み取りのみの getSession() で判定する
   const { data: { session } } = await supabase.auth.getSession()
 
   // 未ログインでマイページ系に直接アクセスした場合のリダイレクト保護
-  if (!session && request.nextUrl.pathname.startsWith('/mypage')) {
+  const isProtected =
+  request.nextUrl.pathname === '/' ||
+  request.nextUrl.pathname.startsWith('/mypage')
+
+  if (!session && isProtected) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)
