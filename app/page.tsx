@@ -69,12 +69,17 @@ function HomePageContent() {
     }
     checkInitialUser();
 
+    const timer = setTimeout(() => {
+      setAuthChecking(false);
+    }, 1000);
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUserId(session?.user?.id || null);
       setAuthChecking(false);
     });
 
     return () => {
+      clearTimeout(timer);
       subscription.unsubscribe();
     };
   }, []);

@@ -54,7 +54,6 @@ function LoginForm() {
       }
 
       router.push("/");
-      router.refresh();
 
     } catch (err: unknown) {
       console.error("システム例外エラー:", err);
