@@ -65,9 +65,6 @@ export async function GET(request: Request) {
 
   const destination =
     next.startsWith("/") && !next.startsWith("//") ? next : "/";
-    
-    const redirectUrl = new URL(destination, origin);
-    redirectUrl.searchParams.set("t", Date.now().toString());
 
   return NextResponse.redirect(new URL(destination, origin));
 }

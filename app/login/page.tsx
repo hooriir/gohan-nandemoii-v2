@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, Suspense } from "react"; 
+import { useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
@@ -13,9 +13,9 @@ function LoginForm() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
+
   const router = useRouter();
-  const searchParams = useSearchParams(); 
+  const searchParams = useSearchParams();
   const isTimeout = searchParams.get("reason") === "timeout";
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -54,7 +54,6 @@ function LoginForm() {
       }
 
       router.push("/");
-      router.refresh();
 
     } catch (err: unknown) {
       console.error("システム例外エラー:", err);
@@ -66,19 +65,19 @@ function LoginForm() {
   return (
     <div className="bg-brand-bg min-h-screen flex items-center justify-center p-4">
       <div className="bg-white p-10 rounded-2xl shadow-xl w-full max-w-[400px] text-center">
-        
+
         <h1 className="flex justify-center mb-2">
           <Link href="/">
             <Image
               src="/images/gohan_bl.svg"
               alt="ごはん？なんでもいい～"
               width={160}
-              height={72}          
+              height={72}
               style={{ width: "160px", height: "auto" }}
             />
           </Link>
         </h1>
-        
+
         <h2 className="text-xl font-bold text-slate-700 mb-6">ログイン</h2>
 
         {isTimeout && (
@@ -134,14 +133,14 @@ function LoginForm() {
           <div className="pt-4 text-center border-t border-slate-100 mt-4 space-y-3">
             <div>
               <p className="text-xs text-slate-400 mb-2">アカウントをお持ちでないですか？</p>
-              <Link 
-                href="/register" 
+              <Link
+                href="/register"
                 className="block w-full py-3 px-4 bg-red-500 hover:bg-red-600 text-white font-bold rounded-xl text-center text-sm transition-all shadow-sm"
               >
                 新規登録はこちら
               </Link>
             </div>
-            
+
             <GoogleAuthButton label="Googleでログイン" />
           </div>
         </form>
