@@ -58,9 +58,14 @@ function HomePageContent() {
     const supabase = createClient();
 
     async function checkInitialUser() {
-      const { data: { user } } = await supabase.auth.getUser();
-      setUserId(user?.id || null);
-      setAuthChecking(false);
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        setUserId(session?.user?.id || null);
+      } catch (err) {
+        console.error("Auth check error:", err);
+      } finally {
+        setAuthChecking(false);
+      }
     }
     checkInitialUser();
 
@@ -269,7 +274,7 @@ function HomePageContent() {
                       sizes="(max-width: 768px) 100vw, 500px"
                       className="object-contain"
                     />
-              git  ) : (
+              ) : (
                     <div className="flex flex-col items-center justify-center text-gray-400">
                       <span className="text-6xl mb-2">
                         <Image
