@@ -58,20 +58,11 @@ function HomePageContent() {
     const supabase = createClient();
 
     async function checkInitialUser() {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        setUserId(session?.user?.id || null);
-      } catch (err) {
-        console.error("Auth check error:", err);
-      } finally {
-        setAuthChecking(false);
-      }
+      const { data: { user } } = await supabase.auth.getUser();
+      setUserId(user?.id || null);
+      setAuthChecking(false);
     }
     checkInitialUser();
-
-    const timer = setTimeout(() => {
-      setAuthChecking(false);
-    }, 1000);
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUserId(session?.user?.id || null);
@@ -79,7 +70,6 @@ function HomePageContent() {
     });
 
     return () => {
-      clearTimeout(timer);
       subscription.unsubscribe();
     };
   }, []);

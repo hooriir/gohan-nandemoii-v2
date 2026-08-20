@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 
 export async function middleware(request: NextRequest) {
-  let response = NextResponse.next({
+  const response = NextResponse.next({
     request: {
       headers: request.headers,
     },
@@ -18,36 +18,30 @@ export async function middleware(request: NextRequest) {
         },
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value, options }) =>
-            request.cookies.set({ name, value, ...options })
+            request.cookies.set(name, value)
           )
-        
-          response = NextResponse.next({
-            request: {
-              headers: request.headers,
-            },
-          })
-
           cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set({ name, value, ...options })
+            response.cookies.set(name, value, options)
           )
         },
       },
     }
   )
 
-  // getUser() は毎回 Supabase への通信が入り全ページの遷移が遅くなるため、
-  // ミドルウェアでは cookie 読み取りのみの getSession() で判定する
-  const { data: { session } } = await supabase.auth.getSession()
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
 
-  // 未ログインでマイページ系に直接アクセスした場合のリダイレクト保護
   const isProtected =
-  request.nextUrl.pathname === '/' ||
-  request.nextUrl.pathname.startsWith('/mypage')
+    request.nextUrl.pathname === '/' ||
+    request.nextUrl.pathname.startsWith('/mypage')
 
   if (!session && isProtected) {
-    const url = request.nextUrl.clone()
-    url.pathname = '/login'
-    return NextResponse.redirect(url)
+    return NextResponse.redirect(new URL('/login', request.url))
+  }
+
+  if (session && request.nextUrl.pathname === '/login') {
+    return NextResponse.redirect(new URL('/', request.url))
   }
 
   return response
@@ -55,6 +49,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|images|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|images|auth/callback|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }
