@@ -55,7 +55,7 @@ export async function GET(request: Request) {
     // レコードが存在しない場合のみ新規作成
     await prisma.user.create({
       data: {
-        // id: user.id,
+        id: user.id,
         email: user.email,
         name: displayName,
         password: "GOOGLE_OAUTH_USER",
@@ -65,6 +65,9 @@ export async function GET(request: Request) {
 
   const destination =
     next.startsWith("/") && !next.startsWith("//") ? next : "/";
+    
+    const redirectUrl = new URL(destination, origin);
+    redirectUrl.searchParams.set("t", Date.now().toString());
 
   return NextResponse.redirect(new URL(destination, origin));
 }
