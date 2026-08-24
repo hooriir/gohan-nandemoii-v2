@@ -3,7 +3,7 @@
 <img width="400" height="auto" alt="スクリーンショット 2026-07-24 232617" src="https://github.com/user-attachments/assets/1cd21ffc-6241-4752-8b50-7631dd503b6a" />
 
 ## アプリURL
-https://gohan-nandemoii.vercel.app/
+https://gohan-nandemoii-v2.vercel.app/
 
 ## デモアカウント
 お試し用のテストアカウントをご用意しています。
