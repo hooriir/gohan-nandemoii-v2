@@ -5,9 +5,7 @@ import type { Dish, Tag } from "@prisma/client";
 
 const ai = new GoogleGenAI({});
 
-type DishWithTags = Dish & {
-  tags: Tag[];
-};
+type DishWithTags = Dish & { tags: Tag[]; };
 
 export async function POST(request: Request) {
   try {
