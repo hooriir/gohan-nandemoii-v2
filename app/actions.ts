@@ -228,7 +228,7 @@ export async function createDish(formData: FormData) {
         select: { id: true },
       });
 
-      tagConnectIds = allTags.map((t) => ({ id: t.id }));
+      tagConnectIds = allTags.map((t: { id: string }) => ({ id: t.id }));
     }
 
     await prisma.dish.create({
