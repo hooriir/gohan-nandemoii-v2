@@ -1,7 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { z } from "zod"; 
+import { z } from "zod";
 import { createClient } from "@/utils/supabase/server";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
@@ -34,7 +34,7 @@ export async function registerUser(formData: FormData) {
   }
 
   const { name, email, password } = validatedFields.data;
-  
+
   const { data: signUpData, error } = await supabase.auth.signUp({
     email,
     password,
@@ -145,7 +145,7 @@ const dishSchema = z.object({
 export async function createDish(formData: FormData) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  
+
   if (!user || !user.id) {
     throw new Error("認証が必要です。ログインしてください。");
   }
@@ -160,7 +160,7 @@ export async function createDish(formData: FormData) {
   const { name, tagsInput, imageFile } = validatedFields.data;
 
   let imageUrl: string | null = null;
-  
+
   if (imageFile && imageFile.size > 0 && imageFile.name !== "undefined") {
     const fileExt = imageFile.name.split(".").pop();
     const fileName = `${user.id}-${Date.now()}.${fileExt}`;
@@ -179,7 +179,7 @@ export async function createDish(formData: FormData) {
     const { data: publicUrlData } = supabase.storage
       .from("dish-images")
       .getPublicUrl(fileName);
-      
+
     imageUrl = publicUrlData.publicUrl;
   }
 
@@ -193,7 +193,7 @@ export async function createDish(formData: FormData) {
 
   try {
     const displayName = user.user_metadata?.name || user.email?.split("@")[0] || "ユーザー";
-    
+
     await prisma.user.upsert({
       where: { id: user.id },
       update: { email: user.email || "" },
@@ -213,7 +213,7 @@ export async function createDish(formData: FormData) {
         select: { id: true, name: true },
       });
 
-      const existingNames = existingTags.map((t) => t.name);
+      const existingNames = existingTags.map((t: { name: string }) => t.name);
       const newNames = tagNames.filter((name) => !existingNames.includes(name));
 
       if (newNames.length > 0) {
@@ -280,7 +280,7 @@ export async function deleteDish(dishId: string) {
       const { error: storageError } = await supabase.storage
         .from("dish-images")
         .remove([fileName]);
-      
+
       if (storageError) {
         console.error("Storage削除エラー:", storageError.message);
       }
