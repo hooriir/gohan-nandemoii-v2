@@ -1,11 +1,13 @@
 import { prisma } from "@/lib/prisma";
 import { createClient } from "@/utils/supabase/server";
 import { GoogleGenAI, ThinkingLevel, Type } from "@google/genai";
-import type { Prisma } from "@prisma/client";
+import type { Dish, Tag } from "@prisma/client";
 
 const ai = new GoogleGenAI({});
 
-type DishWithTags = Prisma.DishGetPayload<{ include: { tags: true } }>;
+type DishWithTags = Dish & {
+  tags: Tag[];
+};
 
 export async function POST(request: Request) {
   try {
