@@ -63,6 +63,15 @@ export async function GET(request: Request) {
     });
   }
 
+  // ユーザーの世帯所属状況をここでチェック
+  const member = await prisma.householdMember.findUnique({
+    where: { userId: user.id },
+  });
+
+  if (!member) {
+    return NextResponse.redirect(new URL("/household/create", origin));
+  }
+
   const destination =
     next.startsWith("/") && !next.startsWith("//") ? next : "/";
 
