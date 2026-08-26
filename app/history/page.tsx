@@ -13,25 +13,21 @@ export default async function HistoryPage() {
     redirect("/login");
   }
 
-  const dbUser = await prisma.user.findUnique({
-    where: { id: supabaseUser.id },
+  const userId = supabaseUser.id;
+
+  // 1. ユーザーが所属している世帯メンバー情報を取得
+  const member = await prisma.householdMember.findUnique({
+    where: { userId: userId },
   });
 
-  if (!dbUser) {
-    return (
-      <div className="bg-[#54C7F3] min-h-screen flex flex-col font-sans">
-        <main className="flex-1 flex flex-col items-center py-8 px-4">
-          <Header />
-          <div className="bg-white rounded-2xl p-8 shadow-xl max-w-md w-full text-center text-slate-600 font-bold">
-            ユーザー情報が見つかりません。
-          </div>
-        </main>
-      </div>
-    );
+  // 世帯に所属していなければ世帯作成画面へリダイレクト
+  if (!member) {
+    redirect("/household/create");
   }
 
+  // 2. 世帯ID (householdId) に紐づく提案履歴を取得
   const logs = await prisma.dishShowLog.findMany({
-    where: { userId: dbUser.id },
+    where: { householdId: member.householdId },
     include: {
       dish: true,
     },
@@ -43,11 +39,11 @@ export default async function HistoryPage() {
   return (
     <div className="bg-[#54C7F3] min-h-screen flex flex-col font-sans">
       <main className="flex-1 flex flex-col items-center py-8 px-4">
-        
+
         <Header />
 
         <div className="bg-white rounded-2xl p-6 sm:p-8 shadow-xl max-w-2xl w-full">
-          
+
           <h1 className="text-xl sm:text-2xl font-black text-[#54C7F3] mb-6 flex items-center justify-center gap-2 tracking-wider">
             これまでの提案履歴
           </h1>
@@ -71,8 +67,8 @@ export default async function HistoryPage() {
                 const imageUrl = log.dish?.imageUrl || null;
 
                 return (
-                  <div 
-                    key={log.id} 
+                  <div
+                    key={log.id}
                     className="flex items-center gap-4 p-3 sm:p-4 border border-slate-100 rounded-xl bg-slate-50/50 hover:bg-slate-50 transition-colors"
                   >
                     {imageUrl ? (
@@ -90,7 +86,7 @@ export default async function HistoryPage() {
                         🍽️
                       </div>
                     )}
-                    
+
                     <div className="flex-1 min-w-0">
                       <h3 className="font-bold text-slate-800 text-base sm:text-lg truncate">
                         {dishName}

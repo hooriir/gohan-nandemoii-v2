@@ -35,6 +35,27 @@ function HomePageContent() {
 
   const isLoggedIn = !!userId;
 
+  // 1. ログインユーザーが世帯に所属しているかチェックし、未所属なら世帯作成画面へ飛ばす
+  useEffect(() => {
+    if (!userId) return;
+
+    async function checkHouseholdStatus() {
+      try {
+        const response = await fetch("/api/household/me");
+        if (response.ok) {
+          const data = await response.json();
+          if (!data.hasHousehold) {
+            router.push("/household/create");
+          }
+        }
+      } catch (err: unknown) {
+        console.error("世帯状況の確認に失敗しました:", err);
+      }
+    }
+
+    checkHouseholdStatus();
+  }, [userId, router]);
+
   useEffect(() => {
     if (!userId) return;
 
@@ -46,7 +67,7 @@ function HomePageContent() {
           const names = data.map((item: { name: string }) => item.name);
           setSuggestionKeywords(names);
         }
-      } catch (err) {
+      } catch (err: unknown) {
         console.error("候補の取得に失敗しました:", err);
       }
     }
@@ -114,8 +135,6 @@ function HomePageContent() {
     };
   }, [isLoggedIn, router]);
 
-
-
   const handleSearch = useCallback(async (searchKeyword: string) => {
     if (!userId) return;
 
@@ -146,7 +165,7 @@ function HomePageContent() {
       const data: RecommendResponse = await response.json();
       setResult(data);
 
-    } catch (err) {
+    } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : "予期せぬエラーが発生しました。";
       setError(errorMessage);
     } finally {
@@ -177,7 +196,6 @@ function HomePageContent() {
     );
   }
 
-
   // ==========================================
   // ログイン中の通常画面
   // ==========================================
@@ -198,7 +216,6 @@ function HomePageContent() {
               className="w-full px-4 py-4 rounded-2xl text-gray-800 bg-white shadow-md focus:outline-none text-center text-lg font-bold placeholder-gray-400"
             />
 
-            {/* 登録されているタグ・メニューのピル型ボタン一覧 */}
             {suggestionKeywords.length > 0 && (
               <div className="flex flex-wrap gap-2 justify-center max-h-32 overflow-y-auto p-1">
                 {suggestionKeywords.map((item, index) => (
@@ -207,9 +224,6 @@ function HomePageContent() {
                     type="button"
                     onClick={() => {
                       setKeyword(item);
-                      // ※もしボタンを押した瞬間にそのまま検索まで実行したい場合は、
-                      // 下のコメントアウトを外して handleSearch(item); を呼ぶこともできます！
-                      // handleSearch(item);
                     }}
                     className="bg-white/20 hover:bg-white/30 active:scale-95 text-white text-xs font-bold px-3 py-1.5 rounded-full border border-white/40 transition-all shadow-sm"
                   >
@@ -269,7 +283,7 @@ function HomePageContent() {
                       sizes="(max-width: 768px) 100vw, 500px"
                       className="object-contain"
                     />
-              ) : (
+                  ) : (
                     <div className="flex flex-col items-center justify-center text-gray-400">
                       <span className="text-6xl mb-2">
                         <Image
@@ -355,7 +369,6 @@ function HomePageContent() {
                 className="w-full px-4 py-3 rounded-xl text-gray-800 bg-gray-50 border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#53cbfb] placeholder-gray-400 font-bold"
               />
 
-              {/* ポップアップ内：登録されているタグ・メニューのピル型ボタン一覧 */}
               {suggestionKeywords.length > 0 && (
                 <div className="flex flex-wrap gap-1.5 justify-center max-h-28 overflow-y-auto p-1 bg-gray-50/50 rounded-xl border border-gray-100">
                   {suggestionKeywords.map((item, index) => (
@@ -365,8 +378,6 @@ function HomePageContent() {
                       disabled={loading}
                       onClick={() => {
                         setKeyword(item);
-                        // もしここでもボタンを押した瞬間にそのまま検索させたい場合は、
-                        // handleSearch(item); をここに入れることも可能です！
                       }}
                       className="bg-white hover:bg-slate-100 active:scale-95 text-slate-700 text-xs font-bold px-2.5 py-1 rounded-full border border-gray-200 transition-all shadow-xs disabled:opacity-50"
                     >

@@ -2,22 +2,27 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import Header from '@/components/Header'; 
-import { createClient } from '@/utils/supabase/client'; 
-import { updateProfile } from '../../actions'; 
+import Header from '@/components/Header';
+import { createClient } from '@/utils/supabase/client';
+import { updateProfile } from '../../actions';
 
 export default function ProfilePage() {
   const router = useRouter();
 
+  // プロフィール用state
   const [isEditing, setIsEditing] = useState(false);
-
   const [name, setName] = useState('');
   const [savedName, setSavedName] = useState('');
   const [email, setEmail] = useState('');
   const [savedEmail, setSavedEmail] = useState('');
   const [password, setPassword] = useState('');
-
   const [isGoogleUser, setIsGoogleUser] = useState(false);
+
+  // 世帯用state
+  const [householdName, setHouseholdName] = useState('');
+  const [savedHouseholdName, setSavedHouseholdName] = useState('');
+  const [isHouseholdEditing, setIsHouseholdEditing] = useState(false);
+  const [isHouseholdSaving, setIsHouseholdSaving] = useState(false);
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -25,28 +30,43 @@ export default function ProfilePage() {
   useEffect(() => {
     const supabase = createClient();
 
-    async function loadUser() {
-      const { data: { user }, error } = await supabase.auth.getUser();
-      
-      if (error || !user) {
-        router.push('/login');
-        return;
+    async function loadData() {
+      try {
+        const { data: { user }, error } = await supabase.auth.getUser();
+
+        if (error || !user) {
+          router.push('/login');
+          return;
+        }
+
+        const googleProvider = user.app_metadata?.provider === 'google' ||
+          user.identities?.some((identity) => identity.provider === 'google');
+        setIsGoogleUser(!!googleProvider);
+
+        const currentName = user.user_metadata?.name || '';
+        const currentEmail = user.email || '';
+        setName(currentName);
+        setSavedName(currentName);
+        setEmail(currentEmail);
+        setSavedEmail(currentEmail);
+
+        // 世帯情報の取得
+        const res = await fetch('/api/household/me');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.hasHousehold && data.household?.name) {
+            setHouseholdName(data.household.name);
+            setSavedHouseholdName(data.household.name);
+          }
+        }
+      } catch (err) {
+        console.error('データ読み込みエラー:', err);
+      } finally {
+        setIsLoading(false);
       }
-
-      const googleProvider = user.app_metadata?.provider === 'google' ||
-        user.identities?.some((identity) => identity.provider === 'google');
-      setIsGoogleUser(!!googleProvider);
-
-      const currentName = user.user_metadata?.name || '';
-      const currentEmail = user.email || '';
-      setName(currentName);
-      setSavedName(currentName);
-      setEmail(currentEmail);
-      setSavedEmail(currentEmail);
-      setIsLoading(false);
     }
 
-    loadUser();
+    loadData();
   }, [router]);
 
   const handleStartEdit = () => {
@@ -64,7 +84,7 @@ export default function ProfilePage() {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSaving) return;
-    
+
     setIsSaving(true);
 
     try {
@@ -74,7 +94,7 @@ export default function ProfilePage() {
       formData.append('password', password);
 
       await updateProfile(formData);
-      
+
       alert('プロフィールを更新しました！');
       setSavedName(name);
       setSavedEmail(email);
@@ -93,36 +113,137 @@ export default function ProfilePage() {
     }
   };
 
+  // 世帯名保存のハンドラー
+  const handleSaveHousehold = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (isHouseholdSaving) return;
+
+    setIsHouseholdSaving(true);
+    try {
+      const res = await fetch('/api/household/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: householdName }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || '世帯名の更新に失敗しました。');
+      }
+
+      alert('世帯名を更新しました！');
+      setSavedHouseholdName(householdName);
+      setIsHouseholdEditing(false);
+      router.refresh();
+    } catch (error) {
+      console.error(error);
+      if (error instanceof Error) {
+        alert(error.message);
+      } else {
+        alert('世帯名の保存中にエラーが発生しました。');
+      }
+    } finally {
+      setIsHouseholdSaving(false);
+    }
+  };
+
+  const handleCancelHouseholdEdit = () => {
+    setHouseholdName(savedHouseholdName);
+    setIsHouseholdEditing(false);
+  };
+
   return (
     <div className="bg-[#54C7F3] min-h-screen flex flex-col font-sans">
       <main className="flex-1 flex flex-col items-center py-8 px-4">
 
         <Header />
 
-        <div className="flex flex-row gap-6 sm:gap-8 max-w-4xl w-full px-4 items-start justify-center">
+        <div className="flex flex-col md:flex-row gap-6 sm:gap-8 max-w-4xl w-full px-4 items-stretch justify-center">
 
-          <div className="bg-white rounded-2xl p-8 shadow-xl flex-1 w-full min-h-[250px] flex flex-col justify-center items-center">
-            <h2 className="text-[#54C7F3] text-center text-2xl font-black mb-8 tracking-wider">
+          {/* 2. 世帯設定カード（追加部分） */}
+          <div className="bg-white rounded-2xl p-8 shadow-xl flex-1 w-full min-h-[320px] flex flex-col justify-start items-center">
+            <h2 className="text-[#54C7F3] text-center text-xl font-black mb-6 tracking-wider">
+              世帯設定
+            </h2>
+
+            {isLoading ? (
+              <div className="flex flex-col items-center justify-center text-[#54C7F3] min-h-[200px]">
+                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[#54C7F3] mb-3"></div>
+                <p className="font-bold text-xs tracking-widest text-gray-400">読み込み中...</p>
+              </div>
+            ) : !isHouseholdEditing ? (
+              <div className="text-center space-y-4 w-full max-w-sm">
+                <div>
+                  <p className="text-xs font-bold text-gray-400 mb-1">所属している世帯名</p>
+                  <h3 className="text-xl font-black text-gray-800 tracking-wide">{householdName || '世帯未所属'}</h3>
+                </div>
+
+                <div className="pt-8">
+                  <button
+                    type="button"
+                    onClick={() => setIsHouseholdEditing(true)}
+                    className="bg-[#54C7F3] text-white font-bold text-xs px-6 py-2.5 rounded-lg shadow hover:bg-[#42b3de] transition"
+                  >
+                    世帯名を変更する
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <form onSubmit={handleSaveHousehold} className="w-full max-w-xs space-y-4">
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-bold text-slate-500 ml-1">世帯名</label>
+                  <input
+                    type="text"
+                    value={householdName}
+                    onChange={(e) => setHouseholdName(e.target.value)}
+                    disabled={isHouseholdSaving}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-xl outline-none focus:border-[#54C7F3] text-slate-800 disabled:bg-slate-50"
+                    required
+                  />
+                </div>
+
+                <div className="flex gap-2 pt-6">
+                  <button
+                    type="button"
+                    onClick={handleCancelHouseholdEdit}
+                    disabled={isHouseholdSaving}
+                    className="flex-1 border border-slate-300 text-slate-500 font-bold text-xs py-2.5 rounded-lg hover:bg-slate-50 transition"
+                  >
+                    キャンセル
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isHouseholdSaving}
+                    className="flex-1 bg-[#54C7F3] text-white font-bold text-xs py-2.5 rounded-lg shadow hover:bg-[#42b3de] transition"
+                  >
+                    {isHouseholdSaving ? '保存中...' : '保存する'}
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+
+          {/* 1. プロフィール設定カード */}
+          <div className="bg-white rounded-2xl p-8 shadow-xl flex-1 w-full min-h-[320px] flex flex-col justify-start items-center">
+            <h2 className="text-[#54C7F3] text-center text-xl font-black mb-6 tracking-wider">
               プロフィール設定
             </h2>
 
             {isLoading ? (
-            <div className="flex flex-col items-center justify-center text-[#54C7F3] min-h-[300px]">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#54C7F3] mb-4"></div>
-              <p className="font-bold text-xs tracking-widest text-gray-400">
-                プロフィールを読み込んでいます...
-              </p>
-            </div>
-          ) : !isEditing ? (
+              <div className="flex flex-col items-center justify-center text-[#54C7F3] min-h-[200px]">
+                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[#54C7F3] mb-3"></div>
+                <p className="font-bold text-xs tracking-widest text-gray-400">読み込み中...</p>
+              </div>
+            ) : !isEditing ? (
               <div className="text-center space-y-3 w-full max-w-sm">
-                <h3 className="text-2xl font-black text-gray-800 tracking-wide mb-4">{name || '名前未設定'}</h3>
-                <p className="text-sm text-gray-600 font-medium">メールアドレス：{email}</p>
-                
+                <h3 className="text-xl font-black text-gray-800 tracking-wide mb-3">{name || '名前未設定'}</h3>
+                <p className="text-sm text-gray-600 font-medium">メール：{email}</p>
+
                 {!isGoogleUser && (
                   <p className="text-sm text-gray-400 font-medium">パスワード：••••••••</p>
                 )}
-                
-                <div className="pt-6">
+
+                <div className="pt-4">
                   <button
                     type="button"
                     onClick={handleStartEdit}
@@ -159,24 +280,12 @@ export default function ProfilePage() {
                     required
                   />
                   {isGoogleUser && (
-                    <p className="text-[10px] text-slate-400 ml-1">
-                      ※Googleログインのため変更できません
-                    </p>
+                    <p className="text-[10px] text-slate-400 ml-1">※Googleログインのため変更不可</p>
                   )}
                 </div>
 
                 {!isGoogleUser && (
-                  <div className="flex flex-col gap-3 pt-2 border-t border-slate-100">
-                    <div className="flex flex-col gap-1">
-                      <label className="text-xs font-bold text-slate-500 ml-1">現在のパスワード</label>
-                      <input
-                        type="text"
-                        value="••••••••"
-                        disabled
-                        className="w-full px-3 py-2 text-sm border border-gray-200 bg-gray-50 text-gray-400 rounded-xl cursor-not-allowed select-none"
-                      />
-                    </div>
-
+                  <div className="flex flex-col gap-2 pt-2 border-t border-slate-100">
                     <div className="flex flex-col gap-1">
                       <label className="text-xs font-bold text-slate-500 ml-1">新しいパスワード</label>
                       <input
@@ -191,26 +300,25 @@ export default function ProfilePage() {
                   </div>
                 )}
 
-                <div className="flex gap-2 pt-4">
+                <div className="flex gap-2 pt-2">
                   <button
                     type="button"
                     onClick={handleCancelEdit}
                     disabled={isSaving}
-                    className="flex-1 border border-slate-300 text-slate-500 font-bold text-xs py-2.5 rounded-lg hover:bg-slate-50 transition disabled:opacity-50"
+                    className="flex-1 border border-slate-300 text-slate-500 font-bold text-xs py-2.5 rounded-lg hover:bg-slate-50 transition"
                   >
                     キャンセル
                   </button>
                   <button
                     type="submit"
                     disabled={isSaving}
-                    className="flex-1 bg-[#54C7F3] text-white font-bold text-xs py-2.5 rounded-lg shadow hover:bg-[#42b3de] transition disabled:bg-slate-300"
+                    className="flex-1 bg-[#54C7F3] text-white font-bold text-xs py-2.5 rounded-lg shadow hover:bg-[#42b3de] transition"
                   >
                     {isSaving ? '保存中...' : '保存する'}
                   </button>
                 </div>
               </form>
             )}
-
           </div>
 
         </div>

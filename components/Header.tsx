@@ -6,7 +6,6 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { usePathname } from "next/navigation";
 
-// クライアント側（ブラウザ）でマウントされたかを判定するためのヘルパー
 const subscribe = () => () => {};
 const getSnapshot = () => true;
 const getServerSnapshot = () => false;
@@ -17,42 +16,73 @@ function useIsMounted() {
 
 export default function Header() {
   const [userName, setUserName] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [householdName, setHouseholdName] = useState<string | null>(null);
+  const [isAuthChecking, setIsAuthChecking] = useState(true); // ユーザー認証チェック中のみに絞る
   const mounted = useIsMounted();
 
   const pathname = usePathname();
 
-  // ログイン情報が得られるまではトップページなら中央モードを優先し、レイアウトシフト（チラつき）を防ぐ
   const isCenteredMode = pathname === "/" && !userName;
 
   useEffect(() => {
     const supabase = createClient();
 
-    async function checkUser() {
+    async function checkUserAndHousehold() {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.user) {
           const name = session.user.user_metadata?.name || session.user.email?.split("@")[0] || "ユーザー";
           setUserName(name);
+          setIsAuthChecking(false);
+
+          fetch("/api/household/me")
+            .then(async (res) => {
+              if (res.ok) {
+                const data = await res.json();
+                if (data.hasHousehold && data.household?.name) {
+                  setHouseholdName(data.household.name);
+                }
+              }
+            })
+            .catch((householdErr) => {
+              console.error("世帯情報の取得エラー:", householdErr);
+            });
+
         } else {
           setUserName(null);
+          setHouseholdName(null);
+          setIsAuthChecking(false);
         }
       } catch (error) {
         console.error("ユーザー情報の取得エラー:", error);
-      } finally {
-        setIsLoading(false);
+        setIsAuthChecking(false);
       }
     }
-    checkUser();
+    checkUserAndHousehold();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (session?.user) {
         const name = session.user.user_metadata?.name || session.user.email?.split("@")[0] || "ユーザー";
         setUserName(name);
+        setIsAuthChecking(false);
+
+        fetch("/api/household/me")
+          .then(async (res) => {
+            if (res.ok) {
+              const data = await res.json();
+              if (data.hasHousehold && data.household?.name) {
+                setHouseholdName(data.household.name);
+              }
+            }
+          })
+          .catch((householdErr) => {
+            console.error("世帯情報の取得エラー:", householdErr);
+          });
       } else {
         setUserName(null);
+        setHouseholdName(null);
+        setIsAuthChecking(false);
       }
-      setIsLoading(false);
     });
 
     return () => {
@@ -65,6 +95,7 @@ export default function Header() {
       const supabase = createClient();
       await supabase.auth.signOut();
       setUserName(null);
+      setHouseholdName(null);
       window.location.href = "/";
     } catch (error) {
       console.error("ログアウトエラー:", error);
@@ -73,23 +104,28 @@ export default function Header() {
 
   const isLoggedIn = !!userName;
 
+  const displayName = isLoggedIn
+    ? householdName
+      ? `${householdName} ${userName}さん`
+      : `${userName}さん`
+    : "ゲストさん";
+
   return (
     <header className={`w-full max-w-[900px] flex flex-col relative px-4 select-none ${
       isCenteredMode ? "items-center justify-center min-h-[75vh]" : "items-center mb-6 mt-4"
     }`}>
-      
+
       <div className={`flex w-full items-center gap-6 ${
-        isCenteredMode 
-          ? "flex-col justify-center" 
+        isCenteredMode
+          ? "flex-col justify-center"
           : "flex-col sm:flex-row sm:justify-between"
       }`}>
-        
-        {/* 左側：タイトルロゴ・名前 */}
+
         <div className={`flex flex-col items-center shrink-0 ${
           isCenteredMode ? "justify-center text-center" : "sm:items-start text-center sm:text-left"
         }`}>
           <p className="text-white text-sm sm:text-base font-bold tracking-wider mb-1 drop-shadow-sm min-h-[1.5rem]">
-            {mounted && !isLoading && (isLoggedIn ? `${userName}さんの` : "ゲストさんの")}
+            {mounted && !isAuthChecking && `${displayName}の`}
           </p>
           <Link href="/" prefetch={false}>
             <Image
@@ -106,15 +142,14 @@ export default function Header() {
 
         {/* 右側：ボタンエリア */}
         <div className="flex items-center justify-center shrink-0 min-h-[85px]">
-          
-          {!mounted || isLoading ? (
+
+          {!mounted || isAuthChecking ? (
             <div className="w-[200px] h-[80px]" />
           ) : isLoggedIn ? (
 
             /* ログイン時（4つの統一カードボタン） */
             <div className="flex items-center gap-1.5 sm:gap-2.5">
-              
-              {/* 1. プロフィール */}
+
               <Link
                 href="/mypage/profile"
                 prefetch={false}
@@ -135,7 +170,6 @@ export default function Header() {
                 </span>
               </Link>
 
-              {/* 2. ごはん登録 */}
               <Link
                 href="/menus"
                 prefetch={false}
@@ -156,7 +190,6 @@ export default function Header() {
                 </span>
               </Link>
 
-              {/* 3. 提案履歴 */}
               <Link
                 href="/history"
                 prefetch={false}
@@ -177,10 +210,9 @@ export default function Header() {
                 </span>
               </Link>
 
-              {/* 4. ログアウト */}
-              <button 
+              <button
                 type="button"
-                className="group bg-[#54C7F3] border-2 border-white rounded-2xl p-2 w-16 h-16 sm:w-20 sm:h-20 flex flex-col items-center justify-center shadow-md hover:scale-105 transition-transform duration-200 shrink-0 cursor-pointer" 
+                className="group bg-[#54C7F3] border-2 border-white rounded-2xl p-2 w-16 h-16 sm:w-20 sm:h-20 flex flex-col items-center justify-center shadow-md hover:scale-105 transition-transform duration-200 shrink-0 cursor-pointer"
                 onClick={handleSignOut}
               >
                 <div className="w-7 h-7 sm:w-9 sm:h-9 mb-1 flex items-center justify-center">
@@ -202,10 +234,8 @@ export default function Header() {
 
             /* 未ログイン時（新規登録 ＆ ログイン） */
             <div className="flex items-center gap-2 sm:gap-3">
-              
-              {/* 新規登録 */}
-              <Link 
-                href="/register" 
+              <Link
+                href="/register"
                 prefetch={false}
                 className="group bg-white rounded-2xl p-2 w-16 h-16 sm:w-20 sm:h-20 flex flex-col items-center justify-center shadow-md hover:scale-105 transition-transform duration-200 shrink-0"
               >
@@ -224,9 +254,8 @@ export default function Header() {
                 </span>
               </Link>
 
-              {/* ログイン */}
-              <Link 
-                href="/login" 
+              <Link
+                href="/login"
                 prefetch={false}
                 className="group bg-[#54C7F3] border-2 border-white rounded-2xl p-2 w-16 h-16 sm:w-20 sm:h-20 flex flex-col items-center justify-center shadow-md hover:scale-105 transition-transform duration-200 shrink-0"
               >
