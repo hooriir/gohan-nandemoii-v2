@@ -22,6 +22,21 @@ export async function POST(request: Request) {
     }
 
     const userId = user.id;
+
+    // 所属世帯の取得
+    const member = await prisma.householdMember.findUnique({
+      where: { userId: userId },
+    });
+
+    if (!member) {
+      return new Response(
+        JSON.stringify({ error: "世帯に所属していません。世帯を作成または参加してください。" }),
+        { status: 400, headers: { "Content-Type": "application/json" } }
+      );
+    }
+
+    const householdId = member.householdId;
+
     const body = await request.json();
     const { keyword } = body;
 
@@ -29,23 +44,10 @@ export async function POST(request: Request) {
     const oneWeekAgo = new Date();
     oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
 
-    const displayName =
-      user.user_metadata?.name || user.email?.split("@")[0] || "ユーザー";
-
-    await prisma.user.upsert({
-      where: { id: userId },
-      update: { email: user.email || "" },
-      create: {
-        id: userId,
-        email: user.email || "",
-        name: displayName,
-        password: "AUTH_USER",
-      },
-    });
-
+    // 世帯の最近の表示履歴を取得
     const recentLogs = await prisma.dishShowLog.findMany({
       where: {
-        userId: userId,
+        householdId: householdId,
         createdAt: { gte: oneWeekAgo },
       },
       select: { dishId: true },
@@ -54,12 +56,13 @@ export async function POST(request: Request) {
 
     const excludedDishIds = recentLogs.map((log) => log.dishId);
 
-    const userDishes = await prisma.dish.findMany({
-      where: { userId: userId },
+    // 世帯に紐づくメニューを取得
+    const householdDishes = await prisma.dish.findMany({
+      where: { householdId: householdId },
       include: { tags: true },
     });
 
-    if (userDishes.length === 0) {
+    if (householdDishes.length === 0) {
       return new Response(
         JSON.stringify({
           error: "登録されているメニューがありません。先にメニューを追加してください。",
@@ -68,14 +71,14 @@ export async function POST(request: Request) {
       );
     }
 
-    const availableDishes = userDishes.filter(
+    const availableDishes = householdDishes.filter(
       (dish) => !excludedDishIds.includes(dish.id)
     );
 
     let targetDishes: DishWithTags[] = [];
 
     if (cleanKeyword === "なんでもいい") {
-      targetDishes = availableDishes.length > 0 ? availableDishes : userDishes;
+      targetDishes = availableDishes.length > 0 ? availableDishes : householdDishes;
     } else {
       const searchKeywords = cleanKeyword
         .replace(/[,，、]/g, " ")
@@ -93,12 +96,12 @@ export async function POST(request: Request) {
       if (matchedAvailable.length > 0) {
         targetDishes = matchedAvailable;
       } else {
-        const matchedAll = userDishes.filter(filterFn);
+        const matchedAll = householdDishes.filter(filterFn);
 
         if (matchedAll.length > 0) {
           targetDishes = matchedAll;
         } else {
-          targetDishes = userDishes.length > 0 ? userDishes : availableDishes;
+          targetDishes = householdDishes.length > 0 ? householdDishes : availableDishes;
         }
       }
     }
@@ -121,7 +124,6 @@ export async function POST(request: Request) {
     ];
     let reasonText = fallbackTemplates[Math.floor(Math.random() * fallbackTemplates.length)];
 
-    // ★ API呼び出しは1回にまとめました
     try {
       const response = await ai.models.generateContent({
         model: "gemini-3.6-flash",
@@ -150,9 +152,10 @@ export async function POST(request: Request) {
       console.error("Gemini APIの理由生成に失敗しました:", aiError);
     }
 
+    // 履歴の保存も householdId を使うように変更
     await prisma.dishShowLog.create({
       data: {
-        userId: userId,
+        householdId: householdId,
         dishId: selectedDish.id,
         keyword: cleanKeyword,
       },

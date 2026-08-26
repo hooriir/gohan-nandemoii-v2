@@ -150,6 +150,15 @@ export async function createDish(formData: FormData) {
     throw new Error("認証が必要です。ログインしてください。");
   }
 
+  // 所属世帯の取得
+  const member = await prisma.householdMember.findUnique({
+    where: { userId: user.id },
+  });
+
+  if (!member) {
+    throw new Error("世帯に所属していません。世帯を作成または参加してください。");
+  }
+
   const rawData = Object.fromEntries(formData.entries());
   const validatedFields = dishSchema.safeParse(rawData);
 
@@ -192,50 +201,44 @@ export async function createDish(formData: FormData) {
     : [];
 
   try {
-    const displayName = user.user_metadata?.name || user.email?.split("@")[0] || "ユーザー";
-
-    await prisma.user.upsert({
-      where: { id: user.id },
-      update: { email: user.email || "" },
-      create: {
-        id: user.id,
-        email: user.email || "",
-        name: displayName,
-        password: "AUTH_USER",
-      },
-    });
-
     let tagConnectIds: { id: string }[] = [];
 
     if (tagNames.length > 0) {
+      // 世帯内のタグを検索
       const existingTags = await prisma.tag.findMany({
-        where: { name: { in: tagNames } },
+        where: { householdId: member.householdId, name: { in: tagNames } },
         select: { id: true, name: true },
       });
 
       const existingNames = existingTags.map((t: { name: string }) => t.name);
       const newNames = tagNames.filter((name) => !existingNames.includes(name));
 
+      // 新規タグ作成時に householdId を含める
       if (newNames.length > 0) {
         await prisma.tag.createMany({
-          data: newNames.map((name) => ({ name })),
+          data: newNames.map((tagName) => ({
+            name: tagName,
+            householdId: member.householdId,
+          })),
           skipDuplicates: true,
         });
       }
 
       const allTags = await prisma.tag.findMany({
-        where: { name: { in: tagNames } },
+        where: { householdId: member.householdId, name: { in: tagNames } },
         select: { id: true },
       });
 
       tagConnectIds = allTags.map((t: { id: string }) => ({ id: t.id }));
     }
 
+    // 料理の登録（householdId と createdById を設定）
     await prisma.dish.create({
       data: {
         name,
         imageUrl,
-        userId: user.id,
+        householdId: member.householdId,
+        createdById: user.id,
         tags: {
           connect: tagConnectIds,
         },
@@ -262,6 +265,15 @@ export async function deleteDish(dishId: string) {
     throw new Error("料理IDが正しくありません");
   }
 
+  // ユーザーの世帯情報を取得
+  const member = await prisma.householdMember.findUnique({
+    where: { userId: user.id },
+  });
+
+  if (!member) {
+    throw new Error("世帯に所属していません");
+  }
+
   const dish = await prisma.dish.findUnique({
     where: { id: dishId },
   });
@@ -270,7 +282,8 @@ export async function deleteDish(dishId: string) {
     return;
   }
 
-  if (dish.userId !== user.id) {
+  // 同じ世帯の料理であるかチェック
+  if (dish.householdId !== member.householdId) {
     throw new Error("削除する権限がありません");
   }
 

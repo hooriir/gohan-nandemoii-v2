@@ -23,20 +23,22 @@ export default async function EditMenuPage({ params }: EditPageProps) {
     redirect("/login");
   }
 
-  const dbUser = await prisma.user.findUnique({
-    where: { id: supabaseUser.id },
+  // 所属世帯の取得
+  const member = await prisma.householdMember.findUnique({
+    where: { userId: supabaseUser.id },
   });
 
-  if (!dbUser) {
+  if (!member) {
     redirect("/login");
   }
 
   const { id } = await params;
 
+  // 世帯IDに一致する料理を取得
   const dish = await prisma.dish.findFirst({
-    where: { 
+    where: {
       id,
-      userId: dbUser.id,
+      householdId: member.householdId,
     },
     include: { tags: true },
   });
@@ -57,18 +59,18 @@ export default async function EditMenuPage({ params }: EditPageProps) {
       redirect("/login");
     }
 
-    const actionDbUser = await prisma.user.findUnique({
-      where: { id: actionUser.id },
+    const actionMember = await prisma.householdMember.findUnique({
+      where: { userId: actionUser.id },
     });
 
-    if (!actionDbUser) {
+    if (!actionMember) {
       redirect("/login");
     }
 
     const existingDish = await prisma.dish.findFirst({
       where: {
         id,
-        userId: actionDbUser.id,
+        householdId: actionMember.householdId,
       },
     });
 
@@ -113,6 +115,47 @@ export default async function EditMenuPage({ params }: EditPageProps) {
       imageUrl = publicUrl;
     }
 
+    const tagNames = tagsInput
+      ? tagsInput
+          .replace(/[,，、]/g, " ")
+          .split(/\s+/)
+          .map((t) => t.trim())
+          .filter(Boolean)
+      : [];
+
+    // タグの紐付け・作成処理（世帯単位）
+    let tagConnectIds: { id: string }[] = [];
+
+    if (tagNames.length > 0) {
+      // 既存のタグを検索
+      const existingTags = await prisma.tag.findMany({
+        where: { householdId: actionMember.householdId, name: { in: tagNames } },
+        select: { id: true, name: true },
+      });
+
+      const existingNames = existingTags.map((t) => t.name);
+      const newNames = tagNames.filter((tagName) => !existingNames.includes(tagName));
+
+      // 新規タグを作成
+      if (newNames.length > 0) {
+        await prisma.tag.createMany({
+          data: newNames.map((tagName) => ({
+            name: tagName,
+            householdId: actionMember.householdId,
+          })),
+          skipDuplicates: true,
+        });
+      }
+
+      // すべての該当タグIDを取得
+      const allTags = await prisma.tag.findMany({
+        where: { householdId: actionMember.householdId, name: { in: tagNames } },
+        select: { id: true },
+      });
+
+      tagConnectIds = allTags.map((t) => ({ id: t.id }));
+    }
+
     await prisma.dish.update({
       where: { id },
       data: {
@@ -120,15 +163,7 @@ export default async function EditMenuPage({ params }: EditPageProps) {
         imageUrl,
         tags: {
           set: [],
-          connectOrCreate: tagsInput
-            ? tagsInput
-                .split(/\s+/)
-                .filter(Boolean)
-                .map((tagName) => ({
-                  where: { name: tagName },
-                  create: { name: tagName },
-                }))
-            : [],
+          connect: tagConnectIds,
         },
       },
     });

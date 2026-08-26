@@ -15,13 +15,22 @@ export async function GET() {
       );
     }
 
+    // 所属世帯の取得
+    const member = await prisma.householdMember.findUnique({
+      where: { userId: user.id },
+    });
+
+    if (!member) {
+      return new Response(
+        JSON.stringify({ error: "世帯に所属していません。" }),
+        { status: 400, headers: { "Content-Type": "application/json" } }
+      );
+    }
+
+    // 世帯IDに紐づくタグを取得
     const tags = await prisma.tag.findMany({
       where: {
-        dishes: {
-          some: {
-            userId: user.id,
-          },
-        },
+        householdId: member.householdId,
       },
       select: { name: true },
     });
