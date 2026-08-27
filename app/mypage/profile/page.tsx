@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import Header from '@/components/Header';
 import { createClient } from '@/utils/supabase/client';
 import { updateProfile } from '../../actions';
+import Link from 'next/link';
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -186,6 +187,16 @@ export default function ProfilePage() {
                   >
                     世帯名を変更する
                   </button>
+
+                  <div className="flex justify-center gap-4 pt-3 text-xs font-bold text-sky-500">
+                    <Link href="/household/invite" className="hover:underline">
+                      + 家族を招待する
+                    </Link>
+                    <span className="text-gray-300">|</span>
+                    <Link href="/household/join" className="hover:underline">
+                      別の世帯に参加
+                    </Link>
+                  </div>
                 </div>
               </div>
             ) : (

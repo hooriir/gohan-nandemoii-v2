@@ -5,6 +5,7 @@ import { createClient } from "@/utils/supabase/server";
 import Link from "next/link";
 import Button from "@/components/Button";
 import { z } from "zod";
+import { getHouseholdContext } from "@/lib/household/auth";
 
 const updateDishSchema = z.object({
   name: z.string().min(1, "ごはん名は必須です。").max(100, "ごはん名は100文字以内で入力してください。"),
@@ -24,12 +25,10 @@ export default async function EditMenuPage({ params }: EditPageProps) {
   }
 
   // 所属世帯の取得
-  const member = await prisma.householdMember.findUnique({
-    where: { userId: supabaseUser.id },
-  });
+  const context = await getHouseholdContext(supabaseUser.id);
 
-  if (!member) {
-    redirect("/login");
+  if (!context) {
+    redirect("/household/create");
   }
 
   const { id } = await params;
@@ -38,7 +37,7 @@ export default async function EditMenuPage({ params }: EditPageProps) {
   const dish = await prisma.dish.findFirst({
     where: {
       id,
-      householdId: member.householdId,
+      householdId: context.householdId,
     },
     include: { tags: true },
   });

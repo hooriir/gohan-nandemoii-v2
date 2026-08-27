@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import Header from "@/components/Header";
 import { redirect } from "next/navigation";
+import { getHouseholdContext } from "@/lib/household/auth";
 
 export default async function HistoryPage() {
   const supabase = await createClient();
@@ -16,18 +17,14 @@ export default async function HistoryPage() {
   const userId = supabaseUser.id;
 
   // 1. ユーザーが所属している世帯メンバー情報を取得
-  const member = await prisma.householdMember.findUnique({
-    where: { userId: userId },
-  });
+  const context = await getHouseholdContext(userId);
 
-  // 世帯に所属していなければ世帯作成画面へリダイレクト
-  if (!member) {
+  if (!context) {
     redirect("/household/create");
   }
 
-  // 2. 世帯ID (householdId) に紐づく提案履歴を取得
   const logs = await prisma.dishShowLog.findMany({
-    where: { householdId: member.householdId },
+    where: { householdId: context.householdId },
     include: {
       dish: true,
     },

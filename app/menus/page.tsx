@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import Header from "@/components/Header";
 import { createClient } from "@/utils/supabase/server";
 import MenuListManager from "@/components/MenuListManager";
+import { getHouseholdContext } from "@/lib/household/auth";
 
 export default async function MenusPage() {
   const supabase = await createClient();
@@ -30,19 +31,17 @@ export default async function MenusPage() {
     },
   });
 
-  // 2. ユーザーが所属している世帯メンバー情報を取得
-  const member = await prisma.householdMember.findUnique({
-    where: { userId: userId },
-  });
+  // 2. 共通ヘルパーで世帯コンテキストを取得
+  const context = await getHouseholdContext(userId);
 
   // 世帯に所属していなければ世帯作成画面へリダイレクト
-  if (!member) {
+  if (!context) {
     redirect("/household/create");
   }
 
-  // 3. 世帯IDに紐づく料理一覧を取得 (householdIdを使用)
+  // 3. 世帯IDに紐づく料理一覧を取得
   const dishes = await prisma.dish.findMany({
-    where: { householdId: member.householdId },
+    where: { householdId: context.householdId },
     include: { tags: true },
     orderBy: { createdAt: "desc" },
   });
