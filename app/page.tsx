@@ -18,11 +18,24 @@ interface RecommendResponse {
   isAiGeneration: boolean;
 }
 
+// 決定済みデータの型
+interface TodayLogData {
+  id: number;
+  dish: Dish;
+  reason: string | null;
+  createdAt: string;
+}
+
 function HomePageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [userId, setUserId] = useState<string | null>(null);
   const [authChecking, setAuthChecking] = useState(true);
+
+  // 本日の決定履歴の状態
+  const [todayDecided, setTodayDecided] = useState<TodayLogData | null>(null);
+  const [checkingTodayLog, setCheckingTodayLog] = useState(true);
+
   const [keyword, setKeyword] = useState("");
   const [suggestionKeywords, setSuggestionKeywords] = useState<string[]>([]);
 
@@ -35,7 +48,7 @@ function HomePageContent() {
 
   const isLoggedIn = !!userId;
 
-  // 1. ログインユーザーが世帯に所属しているかチェックし、未所属なら世帯作成画面へ飛ばす
+  // 1. ログインユーザーが世帯に所属しているかチェック
   useEffect(() => {
     if (!userId) return;
 
@@ -56,6 +69,7 @@ function HomePageContent() {
     checkHouseholdStatus();
   }, [userId, router]);
 
+  // 2. タグの候補取得
   useEffect(() => {
     if (!userId) return;
 
@@ -75,6 +89,30 @@ function HomePageContent() {
     fetchSuggestions();
   }, [userId]);
 
+  // 3. 本日の決定履歴（DishShowLog）をチェックするAPIを叩く
+  useEffect(() => {
+    if (!userId) return;
+
+    async function fetchTodayLog() {
+      try {
+        const res = await fetch("/api/dish-show-log/today");
+        if (res.ok) {
+          const data = await res.json();
+          if (data.exists && data.data) {
+            setTodayDecided(data.data);
+          }
+        }
+      } catch (err) {
+        console.error("本日の決定履歴の取得に失敗しました:", err);
+      } finally {
+        setCheckingTodayLog(false);
+      }
+    }
+
+    fetchTodayLog();
+  }, [userId]);
+
+  // 4. Supabase認証状態の監視
   useEffect(() => {
     const supabase = createClient();
 
@@ -105,6 +143,7 @@ function HomePageContent() {
     }
   }, [result]);
 
+  // 一定時間操作がない場合のタイムアウト
   useEffect(() => {
     if (!isLoggedIn) return;
 
@@ -165,6 +204,15 @@ function HomePageContent() {
       const data: RecommendResponse = await response.json();
       setResult(data);
 
+      // 調理決定後に今日の決定履歴を再取得してステートを更新する
+      const todayRes = await fetch("/api/dish-show-log/today");
+      if (todayRes.ok) {
+        const todayData = await todayRes.json();
+        if (todayData.exists) {
+          setTodayDecided(todayData.data);
+        }
+      }
+
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : "予期せぬエラーが発生しました。";
       setError(errorMessage);
@@ -188,16 +236,149 @@ function HomePageContent() {
     handleSearch(keyword);
   };
 
-  if (authChecking) {
+  if (authChecking || checkingTodayLog) {
     return (
       <div className="bg-[#53cbfb] min-h-screen flex flex-col items-center justify-start p-4 text-white font-bold text-lg">
         <Header />
+        <div className="mt-20">読み込み中...</div>
       </div>
     );
   }
 
   // ==========================================
-  // ログイン中の通常画面
+  // 【パターンA】すでに本日のメニューが決定している場合
+  // ==========================================
+  if (todayDecided) {
+    return (
+      <div className="bg-[#53cbfb] min-h-screen flex flex-col items-center justify-center px-4 text-white font-sans select-none justify-start pb-20">
+        <Header />
+
+        <div className="w-full max-w-xl flex flex-col items-center mt-6">
+          <p className="text-xl md:text-2xl font-black mb-4 tracking-wider drop-shadow-sm">
+            🎉 本日の決定ごはん！
+          </p>
+
+          <div className="w-full bg-white rounded-3xl p-6 shadow-xl text-gray-800 text-center mb-6 border border-white/50">
+            <h2 className="text-2xl md:text-3xl font-black text-[#54C7F3] mb-4 tracking-wide">
+              {todayDecided.dish.name}
+            </h2>
+
+            <div className="w-full h-56 md:h-64 rounded-2xl overflow-hidden mb-6 flex items-center justify-center bg-gray-50 border border-gray-100 relative">
+              {todayDecided.dish.imageUrl ? (
+                <Image
+                  src={todayDecided.dish.imageUrl}
+                  alt={todayDecided.dish.name}
+                  fill
+                  sizes="(max-width: 768px) 100vw, 500px"
+                  className="object-contain"
+                />
+              ) : (
+                <div className="flex flex-col items-center justify-center text-gray-400">
+                  <span className="text-6xl mb-2">
+                    <Image
+                      src="/images/chawan.svg"
+                      alt="茶碗"
+                      width={80}
+                      height={46}
+                    />
+                  </span>
+                  <span className="text-xs">画像なくてもわかるよね</span>
+                </div>
+              )}
+            </div>
+
+            {todayDecided.reason && (
+              <div className="bg-[#54C7F3] border border-[#eeeeee] text-[#ffffff] p-4 rounded-xl text-left text-sm flex items-start gap-3 shadow-inner">
+                <span className="text-2xl mt-0.5">
+                  <Image
+                    src="/images/gohan.svg"
+                    alt="ごはん"
+                    width={40}
+                    height={31}
+                  />
+                </span>
+                <div>
+                  <p className="font-bold text-[11px] text-[#ffffff] uppercase tracking-wider mb-0.5">
+                    ごはんさんより
+                  </p>
+                  <p className="leading-relaxed font-semibold">
+                    {todayDecided.reason}
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="w-full text-center mb-8 px-2 flex flex-col gap-3">
+            <button
+              onClick={() => setIsPopupOpen(true)}
+              className="w-full py-3 bg-white/20 hover:bg-white/30 text-white font-bold text-sm rounded-2xl border border-white/40 transition-all shadow-sm active:scale-95"
+            >
+              やっぱり別のメニューにする（もう一回やる）
+            </button>
+          </div>
+        </div>
+
+        {isPopupOpen && (
+          <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0">
+            <div className="bg-white w-full max-w-lg rounded-t-3xl p-6 shadow-2xl text-gray-800 animate-slide-up">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-black text-slate-700 tracking-wider">
+                  もう一回やり直す？
+                </h3>
+                <button
+                  onClick={() => setIsPopupOpen(false)}
+                  className="text-gray-400 hover:text-gray-600 font-bold text-xl px-2 py-1"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <form onSubmit={onSubmit} className="space-y-4">
+                <input
+                  type="text"
+                  placeholder="今の気分を入力（例：さっぱり、麺類...）"
+                  value={keyword}
+                  onChange={(e) => setKeyword(e.target.value)}
+                  disabled={loading}
+                  className="w-full px-4 py-3 rounded-xl text-gray-800 bg-gray-50 border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#53cbfb] placeholder-gray-400 font-bold"
+                />
+
+                {suggestionKeywords.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 justify-center max-h-28 overflow-y-auto p-1 bg-gray-50/50 rounded-xl border border-gray-100">
+                    {suggestionKeywords.map((item, index) => (
+                      <button
+                        key={index}
+                        type="button"
+                        disabled={loading}
+                        onClick={() => {
+                          setKeyword(item);
+                        }}
+                        className="bg-white hover:bg-slate-100 active:scale-95 text-slate-700 text-xs font-bold px-2.5 py-1 rounded-full border border-gray-200 transition-all shadow-xs disabled:opacity-50"
+                      >
+                        #{item}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full py-3 bg-[#e60012] hover:bg-[#c4000f] disabled:bg-gray-400 text-white font-black rounded-xl shadow-md transition-all active:scale-95"
+                >
+                  これだ！
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ==========================================
+  // 【パターンB】まだ決まっていない場合の通常画面
   // ==========================================
   return (
     <div className="bg-[#53cbfb] min-h-screen flex flex-col items-center justify-center px-4 text-white font-sans select-none justify-start pb-20">
@@ -299,7 +480,7 @@ function HomePageContent() {
                 </div>
 
                 {result.reason && (
-                  <div className="bg-[#54C7F3] border border-[#eeeeee] text-[#ffffff] p-4 rounded-xl text-left text-sm flex items-start gap-3 shadow-inner">
+                  <div className="bg-[#53cbfb] border border-[#eeeeee] text-[#ffffff] p-4 rounded-xl text-left text-sm flex items-start gap-3 shadow-inner">
                     <span className="text-2xl mt-0.5">
                       <Image
                         src="/images/gohan.svg"

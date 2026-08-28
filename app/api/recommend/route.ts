@@ -152,12 +152,11 @@ export async function POST(request: Request) {
       console.error("Gemini APIの理由生成に失敗しました:", aiError);
     }
 
-    // 履歴の保存も householdId を使うように変更
     await prisma.dishShowLog.create({
       data: {
         householdId: householdId,
         dishId: selectedDish.id,
-        keyword: cleanKeyword,
+        keyword: reasonText,
       },
     });
 
