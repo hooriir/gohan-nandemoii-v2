@@ -38,13 +38,12 @@ export async function POST(request: Request) {
     const householdId = member.householdId;
 
     const body = await request.json();
-    const { keyword } = body;
+    const { keyword, type = "WANT" } = body;
 
-    const cleanKeyword = keyword?.trim() || "なんでもいい";
+    const cleanKeyword = keyword?.trim() || "";
     const oneWeekAgo = new Date();
     oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
 
-    // 世帯の最近の表示履歴を取得
     const recentLogs = await prisma.dishShowLog.findMany({
       where: {
         householdId: householdId,
@@ -56,7 +55,6 @@ export async function POST(request: Request) {
 
     const excludedDishIds = recentLogs.map((log) => log.dishId);
 
-    // 世帯に紐づくメニューを取得
     const householdDishes = await prisma.dish.findMany({
       where: { householdId: householdId },
       include: { tags: true },
@@ -77,7 +75,7 @@ export async function POST(request: Request) {
 
     let targetDishes: DishWithTags[] = [];
 
-    if (cleanKeyword === "なんでもいい") {
+    if (type === "ANY" || !cleanKeyword) {
       targetDishes = availableDishes.length > 0 ? availableDishes : householdDishes;
     } else {
       const searchKeywords = cleanKeyword
@@ -85,23 +83,36 @@ export async function POST(request: Request) {
         .split(/\s+/)
         .filter((k: string) => k.length > 0);
 
-      const filterFn = (dish: DishWithTags) =>
-        searchKeywords.some((kw: string) =>
-          dish.name.includes(kw) ||
-          dish.tags.some((t) => t.name.includes(kw))
-        );
+      if (type === "NG") {
+        const filterFn = (dish: DishWithTags) =>
+          !searchKeywords.some((kw: string) =>
+            dish.name.includes(kw) ||
+            dish.tags.some((t) => t.name.includes(kw))
+          );
 
-      const matchedAvailable = availableDishes.filter(filterFn);
+        const matchedAvailable = availableDishes.filter(filterFn);
 
-      if (matchedAvailable.length > 0) {
-        targetDishes = matchedAvailable;
-      } else {
-        const matchedAll = householdDishes.filter(filterFn);
-
-        if (matchedAll.length > 0) {
-          targetDishes = matchedAll;
+        if (matchedAvailable.length > 0) {
+          targetDishes = matchedAvailable;
         } else {
-          targetDishes = householdDishes.length > 0 ? householdDishes : availableDishes;
+          const matchedAll = householdDishes.filter(filterFn);
+          targetDishes = matchedAll.length > 0 ? matchedAll : (availableDishes.length > 0 ? availableDishes : householdDishes);
+        }
+      } else {
+        // WANTの場合は従来の絞り込み
+        const filterFn = (dish: DishWithTags) =>
+          searchKeywords.some((kw: string) =>
+            dish.name.includes(kw) ||
+            dish.tags.some((t) => t.name.includes(kw))
+          );
+
+        const matchedAvailable = availableDishes.filter(filterFn);
+
+        if (matchedAvailable.length > 0) {
+          targetDishes = matchedAvailable;
+        } else {
+          const matchedAll = householdDishes.filter(filterFn);
+          targetDishes = matchedAll.length > 0 ? matchedAll : (householdDishes.length > 0 ? householdDishes : availableDishes);
         }
       }
     }
@@ -110,17 +121,24 @@ export async function POST(request: Request) {
       targetDishes[Math.floor(Math.random() * targetDishes.length)];
 
     const prompt = `あなたは親しみやすくておしゃべりな専属シェフアシスタントです。
-ユーザーの今の気分・要望: 「${cleanKeyword}」
-今日選ばれた料理: 「${selectedDish.name}」
+      ユーザーの要望タイプ: 「${type}」
+      ユーザーのキーワード: 「${cleanKeyword || "なし"}」
+      今日選ばれた料理: 「${selectedDish.name}」
 
-この料理がユーザーの要望や今の気分にどうしてぴったりなのか、まるで友達や家族に話しかけるように、温かみのあるトーンで120〜150文字程度の少し長めの文章で「おすすめの理由」を教えてください。
-毎回、違った切り口やユーモアを交えて、新鮮味のあるコメントにしてください。`;
+      ${
+        type === "NG"
+          ? `ユーザーが避けたい（NGな）キーワード「${cleanKeyword}」をうまく避けて、この「${selectedDish.name}」を選んだ理由や、この料理の魅力について、まるで友達や家族に話しかけるように温かみのあるトーンで120〜150文字程度で教えてください。`
+          : `この料理がユーザーの要望や今の気分にどうしてぴったりなのか、まるで友達や家族に話しかけるように、温かみのあるトーンで120〜150文字程度の少し長めの文章で「おすすめの理由」を教えてください。`
+      }
+      毎回、違った切り口やユーモアを交えて、新鮮味のあるコメントにしてください。`;
 
     let isAiSuccess = false;
     const fallbackTemplates = [
-      `「${cleanKeyword}」の気分なら、やっぱり${selectedDish.name}が最高ですね！美味しく食べて元気を出しましょう！`,
-      `本日は「${cleanKeyword}」に合わせて、${selectedDish.name}をチョイスしました。楽しい食卓にしてくださいね！`,
-      `「${cleanKeyword}」というリクエストにお応えして、今日は${selectedDish.name}で決まりです！`,
+      type === "NG"
+        ? `「${cleanKeyword}」を避けて、本日はすっきり${selectedDish.name}をチョイスしました！楽しく美味しく召し上がれ！`
+        : `「${cleanKeyword || "おまかせ"}」の気分なら、やっぱり${selectedDish.name}が最高ですね！美味しく食べて元気を出しましょう！`,
+      `本日はリクエストに合わせて、${selectedDish.name}をチョイスしました。楽しい食卓にしてくださいね！`,
+      `今日は${selectedDish.name}で決まりです！`,
     ];
     let reasonText = fallbackTemplates[Math.floor(Math.random() * fallbackTemplates.length)];
 

@@ -1,9 +1,9 @@
 import { prisma } from "@/lib/prisma";
-import { createClient } from "@/utils/supabase/server";
+import { createClient } from "@/utils/supabase/client";
 
 export async function GET() {
   try {
-    const supabase = await createClient();
+    const supabase = createClient();
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -15,7 +15,6 @@ export async function GET() {
       );
     }
 
-    // 所属世帯の取得
     const member = await prisma.householdMember.findUnique({
       where: { userId: user.id },
     });
@@ -29,14 +28,20 @@ export async function GET() {
 
     const householdId = member.householdId;
 
-    // 本日の日付範囲（0:00:00 〜 23:59:59）を設定
-    const startOfDay = new Date();
-    startOfDay.setHours(0, 0, 0, 0);
+    const formatter = new Intl.DateTimeFormat("en-US", {
+      timeZone: "Asia/Tokyo",
+      year: "numeric",
+      month: "numeric",
+      day: "numeric",
+    });
+    const parts = formatter.formatToParts(new Date());
+    const year = parseInt(parts.find((p) => p.type === "year")!.value);
+    const month = parseInt(parts.find((p) => p.type === "month")!.value) - 1;
+    const day = parseInt(parts.find((p) => p.type === "day")!.value);
 
-    const endOfDay = new Date();
-    endOfDay.setHours(23, 59, 59, 999);
+    const startOfDay = new Date(Date.UTC(year, month, day, 0, 0, 0, 0) - 9 * 60 * 60 * 1000);
+    const endOfDay = new Date(Date.UTC(year, month, day, 23, 59, 59, 999) - 9 * 60 * 60 * 1000);
 
-    // 世帯単位で「今日」作られた DishShowLog を検索（料理のデータも一緒に取得）
     const todayLog = await prisma.dishShowLog.findFirst({
       where: {
         householdId: householdId,
@@ -46,7 +51,7 @@ export async function GET() {
         },
       },
       include: {
-        dish: true, // 紐づく料理情報（名前や画像）も一緒に取る
+        dish: true,
       },
       orderBy: {
         createdAt: "desc",
@@ -70,7 +75,7 @@ export async function GET() {
             name: todayLog.dish.name,
             imageUrl: todayLog.dish.imageUrl || null,
           },
-          reason: todayLog.keyword, // AI調停の理由やキーワードとして保存されていたもの
+          reason: todayLog.keyword,
           createdAt: todayLog.createdAt,
         },
       }),

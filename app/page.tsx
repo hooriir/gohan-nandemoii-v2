@@ -26,17 +26,35 @@ interface TodayLogData {
   createdAt: string;
 }
 
+// 家族の希望データの型
+interface MemberMealRequest {
+  userId: string;
+  email: string;
+  request: {
+    type: "WANT" | "NG" | "ANY";
+    keyword: string | null;
+    dishName: string | null;
+  } | null;
+}
+
 function HomePageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [userId, setUserId] = useState<string | null>(null);
   const [authChecking, setAuthChecking] = useState(true);
 
-  // 本日の決定履歴の状態
   const [todayDecided, setTodayDecided] = useState<TodayLogData | null>(null);
   const [checkingTodayLog, setCheckingTodayLog] = useState(true);
 
+  const [familyRequests, setFamilyRequests] = useState<MemberMealRequest[]>([]);
+
+  const [myRequestType, setMyRequestType] = useState<"WANT" | "NG" | "ANY">("WANT");
+  const [myRequestKeyword, setMyRequestKeyword] = useState("");
+  const [isSubmittingRequest, setIsSubmittingRequest] = useState(false);
+  const [requestMessage, setRequestMessage] = useState<string | null>(null);
+
   const [keyword, setKeyword] = useState("");
+  const [searchType, setSearchType] = useState<string>("WANT");
   const [suggestionKeywords, setSuggestionKeywords] = useState<string[]>([]);
 
   const [loading, setLoading] = useState(false);
@@ -48,14 +66,34 @@ function HomePageContent() {
 
   const isLoggedIn = !!userId;
 
-  // 1. ログインユーザーが世帯に所属しているかチェック
+  const executeLoadFamilyRequests = async (targetUserId: string) => {
+    try {
+      const res = await fetch("/api/meal-requests/today");
+      if (res.ok) {
+        const data = await res.json();
+        if (data.requests) {
+          setFamilyRequests(data.requests);
+
+          const currentMe = data.requests.find((m: MemberMealRequest) => m.userId === targetUserId);
+          if (currentMe && currentMe.request) {
+            setMyRequestType(currentMe.request.type);
+            setMyRequestKeyword(currentMe.request.keyword || currentMe.request.dishName || "");
+          }
+        }
+      }
+    } catch (err) {
+      console.error("家族の希望の取得に失敗しました:", err);
+    }
+  };
+
   useEffect(() => {
     if (!userId) return;
 
+    let isMounted = true;
     async function checkHouseholdStatus() {
       try {
         const response = await fetch("/api/household/me");
-        if (response.ok) {
+        if (response.ok && isMounted) {
           const data = await response.json();
           if (!data.hasHousehold) {
             router.push("/household/create");
@@ -67,16 +105,19 @@ function HomePageContent() {
     }
 
     checkHouseholdStatus();
+    return () => {
+      isMounted = false;
+    };
   }, [userId, router]);
 
-  // 2. タグの候補取得
   useEffect(() => {
     if (!userId) return;
 
+    let isMounted = true;
     async function fetchSuggestions() {
       try {
         const response = await fetch("/api/tags");
-        if (response.ok) {
+        if (response.ok && isMounted) {
           const data = await response.json();
           const names = data.map((item: { name: string }) => item.name);
           setSuggestionKeywords(names);
@@ -87,16 +128,19 @@ function HomePageContent() {
     }
 
     fetchSuggestions();
+    return () => {
+      isMounted = false;
+    };
   }, [userId]);
 
-  // 3. 本日の決定履歴（DishShowLog）をチェックするAPIを叩く
   useEffect(() => {
     if (!userId) return;
 
+    let isMounted = true;
     async function fetchTodayLog() {
       try {
         const res = await fetch("/api/dish-show-log/today");
-        if (res.ok) {
+        if (res.ok && isMounted) {
           const data = await res.json();
           if (data.exists && data.data) {
             setTodayDecided(data.data);
@@ -105,14 +149,88 @@ function HomePageContent() {
       } catch (err) {
         console.error("本日の決定履歴の取得に失敗しました:", err);
       } finally {
-        setCheckingTodayLog(false);
+        if (isMounted) {
+          setCheckingTodayLog(false);
+        }
       }
     }
 
     fetchTodayLog();
+    return () => {
+      isMounted = false;
+    };
   }, [userId]);
 
-  // 4. Supabase認証状態の監視
+  useEffect(() => {
+    if (!userId) return;
+
+    let isMounted = true;
+    (async () => {
+      try {
+        const res = await fetch("/api/meal-requests/today");
+        if (res.ok && isMounted) {
+          const data = await res.json();
+          if (data.requests) {
+            setFamilyRequests(data.requests);
+
+            const currentMe = data.requests.find((m: MemberMealRequest) => m.userId === userId);
+            if (currentMe && currentMe.request) {
+              setMyRequestType(currentMe.request.type);
+              setMyRequestKeyword(currentMe.request.keyword || currentMe.request.dishName || "");
+            }
+          }
+        }
+      } catch (err) {
+        console.error("家族の希望の取得に失敗しました:", err);
+      }
+    })();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [userId]);
+
+  const handleMealRequestSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!userId) return;
+    setIsSubmittingRequest(true);
+    setRequestMessage(null);
+
+    try {
+      const res = await fetch("/api/meal-requests/today", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          type: myRequestType,
+          keyword: myRequestKeyword,
+        }),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.error || "希望の保存に失敗しました。");
+      }
+
+      setRequestMessage("希望を保存しました！");
+      await executeLoadFamilyRequests(userId);
+
+      const targetKeyword = myRequestKeyword.trim() || (myRequestType === "ANY" ? "なんでもいい" : myRequestType);
+
+      await handleSearch(targetKeyword, myRequestType);
+
+      setTimeout(() => {
+        setRequestMessage(null);
+      }, 3000);
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : "予期せぬエラーが発生しました。";
+      setRequestMessage(errorMessage);
+    } finally {
+      setIsSubmittingRequest(false);
+    }
+  };
+
   useEffect(() => {
     const supabase = createClient();
 
@@ -143,7 +261,6 @@ function HomePageContent() {
     }
   }, [result]);
 
-  // 一定時間操作がない場合のタイムアウト
   useEffect(() => {
     if (!isLoggedIn) return;
 
@@ -174,11 +291,12 @@ function HomePageContent() {
     };
   }, [isLoggedIn, router]);
 
-  const handleSearch = useCallback(async (searchKeyword: string) => {
+  const handleSearch = useCallback(async (searchKeyword: string, requestType: string = "WANT") => {
     if (!userId) return;
 
     const cleanKeyword = searchKeyword.trim() || "なんでもいい";
     setKeyword(cleanKeyword);
+    setSearchType(requestType); // ← 追加：現在の検索タイプを保持
     setHasSearched(true);
     setLoading(true);
     setError(null);
@@ -193,6 +311,7 @@ function HomePageContent() {
         },
         body: JSON.stringify({
           keyword: cleanKeyword,
+          type: requestType,
         }),
       });
 
@@ -204,7 +323,6 @@ function HomePageContent() {
       const data: RecommendResponse = await response.json();
       setResult(data);
 
-      // 調理決定後に今日の決定履歴を再取得してステートを更新する
       const todayRes = await fetch("/api/dish-show-log/today");
       if (todayRes.ok) {
         const todayData = await todayRes.json();
@@ -255,7 +373,7 @@ function HomePageContent() {
 
         <div className="w-full max-w-xl flex flex-col items-center mt-6">
           <p className="text-xl md:text-2xl font-black mb-4 tracking-wider drop-shadow-sm">
-            🎉 本日の決定ごはん！
+            本日の決定ごはん！
           </p>
 
           <div className="w-full bg-white rounded-3xl p-6 shadow-xl text-gray-800 text-center mb-6 border border-white/50">
@@ -309,14 +427,14 @@ function HomePageContent() {
             )}
           </div>
 
-          <div className="w-full text-center mb-8 px-2 flex flex-col gap-3">
+          {/* <div className="w-full text-center mb-8 px-2 flex flex-col gap-3">
             <button
               onClick={() => setIsPopupOpen(true)}
               className="w-full py-3 bg-white/20 hover:bg-white/30 text-white font-bold text-sm rounded-2xl border border-white/40 transition-all shadow-sm active:scale-95"
             >
               やっぱり別のメニューにする（もう一回やる）
             </button>
-          </div>
+          </div> */}
         </div>
 
         {isPopupOpen && (
@@ -384,11 +502,132 @@ function HomePageContent() {
     <div className="bg-[#53cbfb] min-h-screen flex flex-col items-center justify-center px-4 text-white font-sans select-none justify-start pb-20">
       <Header />
 
-      {!hasSearched ? (
-        <div className="w-full max-w-xl text-center py-12 flex flex-col items-center">
-          <p className="text-2xl font-black mb-8 tracking-wider">今日のごはんは．．．？</p>
+      <div className="w-full max-w-xl bg-white/10 backdrop-blur-md rounded-2xl p-4 mb-4 border border-white/20 text-white">
+        <h3 className="text-sm font-black tracking-wider mb-3 text-center flex items-center justify-center gap-1">
+          家族の今日の希望ボード
+        </h3>
+        {familyRequests.length === 0 ? (
+          <p className="text-xs text-center text-white/80">まだ誰も希望を出していません</p>
+        ) : (
+          <div className="space-y-2">
+            {familyRequests.map((member) => (
+              <div
+                key={member.userId}
+                className="bg-white/20 rounded-xl p-3 flex items-center justify-between text-xs"
+              >
+                <div className="font-bold truncate max-w-[120px]">
+                  {member.email.split("@")[0]}
+                </div>
+                <div>
+                  {member.request ? (
+                    <div className="flex items-center gap-2">
+                      <span className={`px-2 py-0.5 rounded-full font-black text-[10px] ${
+                        member.request.type === "WANT" ? "bg-red-500 text-white" :
+                        member.request.type === "NG" ? "bg-gray-700 text-white" : "bg-blue-500 text-white"
+                      }`}>
+                        {member.request.type}
+                      </span>
+                      {member.request.dishName && (
+                        <span className="font-bold">🍽️ {member.request.dishName}</span>
+                      )}
+                      {member.request.keyword && (
+                        <span className="text-white/90">💬 {member.request.keyword}</span>
+                      )}
+                    </div>
+                  ) : (
+                    <span className="text-white/60 italic">未入力</span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
-          <form onSubmit={onSubmit} className="w-full px-2 flex flex-col gap-4">
+      <div className="w-full max-w-xl bg-white/15 backdrop-blur-md rounded-2xl p-4 mb-6 border border-white/25 text-white">
+        <h4 className="text-xs font-black tracking-wider mb-2 text-center">
+          今日のあなたの希望を登録する
+        </h4>
+        <form onSubmit={handleMealRequestSubmit} className="space-y-3">
+          <div className="flex gap-2 justify-center">
+            <button
+              type="button"
+              onClick={() => setMyRequestType("WANT")}
+              className={`flex-1 py-1.5 rounded-lg text-xs font-black transition-all ${
+                myRequestType === "WANT" ? "bg-red-500 text-white shadow-md" : "bg-white/20 text-white/80"
+              }`}
+            >
+              WANT（食べたい）
+            </button>
+            <button
+              type="button"
+              onClick={() => setMyRequestType("NG")}
+              className={`flex-1 py-1.5 rounded-lg text-xs font-black transition-all ${
+                myRequestType === "NG" ? "bg-gray-700 text-white shadow-md" : "bg-white/20 text-white/80"
+              }`}
+            >
+              NG（避けたい）
+            </button>
+            <button
+              type="button"
+              onClick={() => setMyRequestType("ANY")}
+              className={`flex-1 py-1.5 rounded-lg text-xs font-black transition-all ${
+                myRequestType === "ANY" ? "bg-blue-500 text-white shadow-md" : "bg-white/20 text-white/80"
+              }`}
+            >
+              ANY（おまかせ）
+            </button>
+          </div>
+
+          <div className="flex gap-2">
+            <input
+              type="text"
+              placeholder="気分やキーワード（例：肉、さっぱり、麺類）"
+              value={myRequestKeyword}
+              onChange={(e) => setMyRequestKeyword(e.target.value)}
+              disabled={isSubmittingRequest}
+              className="flex-1 px-3 py-2 rounded-xl text-gray-800 bg-white text-xs font-bold placeholder-gray-400 focus:outline-none"
+            />
+            <button
+              type="submit"
+              disabled={isSubmittingRequest}
+              className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white text-xs font-black rounded-xl shadow transition-all active:scale-95 disabled:opacity-50"
+            >
+              {isSubmittingRequest ? "保存中..." : "希望を保存"}
+            </button>
+          </div>
+
+          {suggestionKeywords.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 justify-center max-h-24 overflow-y-auto pt-1">
+              {suggestionKeywords.map((item, index) => (
+                <button
+                  key={index}
+                  type="button"
+                  disabled={isSubmittingRequest}
+                  onClick={() => {
+                    setMyRequestKeyword(item);
+                  }}
+                  className="bg-white/20 hover:bg-white/30 active:scale-95 text-white text-[11px] font-bold px-2.5 py-1 rounded-full border border-white/30 transition-all shadow-xs disabled:opacity-50"
+                >
+                  #{item}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {requestMessage && (
+            <p className="text-center text-[11px] font-bold text-yellow-200 animate-pulse">
+              {requestMessage}
+            </p>
+          )}
+        </form>
+      </div>
+
+      {!hasSearched ? (
+        <div className="w-full max-w-xl text-center py-2 flex flex-col items-center">
+          <p className="text-2xl font-black mb-6 tracking-wider">今日のごはんは．．．？</p>
+
+          {/* <form onSubmit={onSubmit} className="w-full px-2 flex flex-col gap-4">
             <input
               type="text"
               placeholder="さっぱり、こってり、なんでもいい..."
@@ -420,7 +659,7 @@ function HomePageContent() {
             >
               これに決めた！
             </button>
-          </form>
+          </form> */}
         </div>
       ) : (
         <div className="w-full max-w-xl flex flex-col items-center">
@@ -435,6 +674,8 @@ function HomePageContent() {
                 <p className="text-gray-500 font-bold">
                   {keyword === "なんでもいい"
                     ? "AIシェフが今日の気分を分析中..."
+                    : searchType === "NG"
+                    ? `「${keyword}」以外から最高の1品を選び中...`
                     : `「${keyword}」から最高の1品を選び中...`}
                 </p>
               </div>
@@ -504,12 +745,12 @@ function HomePageContent() {
           </div>
 
           <div className="w-full text-center mb-8 px-2 flex flex-col gap-3">
-            <button
+            {/* <button
               onClick={() => setIsPopupOpen(true)}
               className="w-full py-4 bg-[#e60012] hover:bg-[#c4000f] text-white font-black text-xl rounded-2xl shadow-lg transition-transform active:scale-95"
             >
               もう一回やる
-            </button>
+            </button> */}
 
             <button
               onClick={() => {
@@ -525,7 +766,7 @@ function HomePageContent() {
         </div>
       )}
 
-      {isPopupOpen && (
+      {/* {isPopupOpen && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0">
           <div className="bg-white w-full max-w-lg rounded-t-3xl p-6 shadow-2xl text-gray-800 animate-slide-up">
             <div className="flex justify-between items-center mb-4">
@@ -578,7 +819,7 @@ function HomePageContent() {
             </form>
           </div>
         </div>
-      )}
+      )} */}
     </div>
   );
 }
