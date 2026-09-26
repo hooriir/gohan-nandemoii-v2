@@ -29,6 +29,7 @@ model User {
 model Household {
   id        String   @id @default(cuid())
   name      String
+  deadlineMessage String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -78,7 +79,7 @@ model MealRequest {
   userId      String
   requestDate DateTime    @db.Date
   type        RequestType
-  dishId      String?     
+  dishId      String?
   keyword     String?
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt

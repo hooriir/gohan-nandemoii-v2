@@ -1,5 +1,15 @@
+import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { createClient } from "@/utils/supabase/server";
+
+/**
+ * 日本時間（JST）における「本日の00:00:00」のDateオブジェクトを算出する関数
+ */
+function getTodayJst(): Date {
+  const now = new Date();
+  const jstString = now.toLocaleDateString("en-US", { timeZone: "Asia/Tokyo" });
+  return new Date(`${jstString} 00:00:00`);
+}
 
 export async function GET() {
   try {
@@ -9,10 +19,7 @@ export async function GET() {
     } = await supabase.auth.getUser();
 
     if (!user) {
-      return new Response(
-        JSON.stringify({ error: "認証が必要です。" }),
-        { status: 401, headers: { "Content-Type": "application/json" } }
-      );
+      return NextResponse.json({ error: "認証が必要です。" }, { status: 401 });
     }
 
     const member = await prisma.householdMember.findUnique({
@@ -20,10 +27,7 @@ export async function GET() {
     });
 
     if (!member) {
-      return new Response(
-        JSON.stringify({ error: "世帯に所属していません。" }),
-        { status: 400, headers: { "Content-Type": "application/json" } }
-      );
+      return NextResponse.json({ error: "世帯に所属していません。" }, { status: 400 });
     }
 
     const householdId = member.householdId;
@@ -40,8 +44,8 @@ export async function GET() {
       },
     });
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    // 日本時間の本日（00:00:00）の日付を取得
+    const today = getTodayJst();
 
     const memberIds = householdMembers.map((m) => m.userId);
     const requests = await prisma.mealRequest.findMany({
@@ -73,15 +77,12 @@ export async function GET() {
       };
     });
 
-    return new Response(
-      JSON.stringify({ requests: result }),
-      { headers: { "Content-Type": "application/json" } }
-    );
+    return NextResponse.json({ requests: result });
   } catch (error) {
     console.error("Fetch Meal Requests Error:", error);
-    return new Response(
-      JSON.stringify({ error: "家族の希望の取得に失敗しました。" }),
-      { status: 500, headers: { "Content-Type": "application/json" } }
+    return NextResponse.json(
+      { error: "家族の希望の取得に失敗しました。" },
+      { status: 500 }
     );
   }
 }
@@ -94,10 +95,7 @@ export async function POST(request: Request) {
     } = await supabase.auth.getUser();
 
     if (!user) {
-      return new Response(
-        JSON.stringify({ error: "認証が必要です。" }),
-        { status: 401, headers: { "Content-Type": "application/json" } }
-      );
+      return NextResponse.json({ error: "認証が必要です。" }, { status: 401 });
     }
 
     const member = await prisma.householdMember.findUnique({
@@ -105,26 +103,14 @@ export async function POST(request: Request) {
     });
 
     if (!member) {
-      return new Response(
-        JSON.stringify({ error: "世帯に所属していません。" }),
-        { status: 400, headers: { "Content-Type": "application/json" } }
-      );
+      return NextResponse.json({ error: "世帯に所属していません。" }, { status: 400 });
     }
 
     const body = await request.json();
     const { type, keyword, dishId } = body;
 
-    const formatter = new Intl.DateTimeFormat("en-US", {
-      timeZone: "Asia/Tokyo",
-      year: "numeric",
-      month: "numeric",
-      day: "numeric",
-    });
-    const parts = formatter.formatToParts(new Date());
-    const year = parseInt(parts.find((p) => p.type === "year")!.value);
-    const month = parseInt(parts.find((p) => p.type === "month")!.value) - 1;
-    const day = parseInt(parts.find((p) => p.type === "day")!.value);
-    const requestDate = new Date(Date.UTC(year, month, day, 0, 0, 0, 0) - 9 * 60 * 60 * 1000);
+    // 日本時間の本日（00:00:00）の日付を取得
+    const requestDate = getTodayJst();
 
     const mealRequest = await prisma.mealRequest.upsert({
       where: {
@@ -149,15 +135,12 @@ export async function POST(request: Request) {
       },
     });
 
-    return new Response(
-      JSON.stringify({ success: true, mealRequest }),
-      { headers: { "Content-Type": "application/json" } }
-    );
+    return NextResponse.json({ success: true, mealRequest });
   } catch (error) {
     console.error("Save Meal Request Error:", error);
-    return new Response(
-      JSON.stringify({ error: "希望の保存に失敗しました。" }),
-      { status: 500, headers: { "Content-Type": "application/json" } }
+    return NextResponse.json(
+      { error: "希望の保存に失敗しました。" },
+      { status: 500 }
     );
   }
 }

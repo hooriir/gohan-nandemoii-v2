@@ -1,78 +1,61 @@
-
-import { NextResponse } from 'next/server';
-import { PrismaClient, HouseholdRole } from '@prisma/client';
-import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
+import { NextResponse } from "next/server";
+import { createClient } from "@/utils/supabase/server";
+import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    const { name } = body;
-
-    if (!name) {
-      return NextResponse.json({ error: '世帯名は必須です。' }, { status: 400 });
-    }
-
-    const cookieStore = await cookies();
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          getAll() {
-            return cookieStore.getAll();
-          },
-          setAll() {},
-        },
-      }
-    );
-
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const supabase = await createClient();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
 
     if (authError || !user) {
-      return NextResponse.json({ error: '認証されていません。ログインしてください。' }, { status: 401 });
+      return NextResponse.json({ error: "認証されていません。" }, { status: 401 });
     }
 
-    const userId = user.id;
+    const { name } = await request.json();
+    if (!name || typeof name !== "string" || !name.trim()) {
+      return NextResponse.json({ error: "世帯名を入力してください。" }, { status: 400 });
+    }
 
-    const existingMember = await prisma.householdMember.findUnique({
-      where: { userId },
+    // すでに世帯に所属しているかチェック
+    const existingMember = await prisma.householdMember.findFirst({
+      where: { userId: user.id },
     });
 
     if (existingMember) {
       return NextResponse.json(
-        { error: 'すでに別の世帯に所属しています。' },
+        { error: "すでに対象の世帯に所属しています。" },
         { status: 400 }
       );
     }
 
-    const newHousehold = await prisma.$transaction(async (tx) => {
+    // トランザクション処理：世帯の作成と作成者のOWNER登録を同時に実行
+    const result = await prisma.$transaction(async (tx) => {
       const household = await tx.household.create({
-        data: { name },
-      });
-
-      await tx.householdMember.create({
         data: {
-          householdId: household.id,
-          userId,
-          role: HouseholdRole.OWNER,
+          name: name.trim(),
         },
       });
 
-      return household;
+      const member = await tx.householdMember.create({
+        data: {
+          householdId: household.id,
+          userId: user.id,
+          role: "OWNER",
+        },
+      });
+
+      return { household, member };
     });
 
-    return NextResponse.json({
-      success: true,
-      household: newHousehold,
-    });
-  } catch (error: unknown) {
-    console.error('世帯作成エラー:', error);
-    return NextResponse.json(
-      { error: '世帯の作成に失敗しました。' },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: true, household: result.household });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "予期せぬエラーが発生しました。";
+    console.error("Household creation error:", err);
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

@@ -1,49 +1,48 @@
-import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
-import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
-
-const prisma = new PrismaClient();
+import { NextResponse } from "next/server";
+import { createClient } from "@/utils/supabase/server";
+import { prisma } from "@/lib/prisma";
 
 export async function GET() {
   try {
-    const cookieStore = await cookies();
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          getAll() {
-            return cookieStore.getAll();
-          },
-          setAll() {},
-        },
-      }
-    );
-
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const supabase = await createClient();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
 
     if (authError || !user) {
-      return NextResponse.json({ error: '認証されていません。' }, { status: 401 });
+      return NextResponse.json({ hasHousehold: false }, { status: 401 });
     }
 
-    // ユーザーが所属している世帯メンバー情報を検索
-    const member = await prisma.householdMember.findUnique({
+    // Prisma を使って所属世帯と世帯情報を一括取得
+    const memberData = await prisma.householdMember.findFirst({
       where: { userId: user.id },
-      include: { household: true }, // 世帯の詳細情報も一緒に取得
+      include: {
+        household: true, // Household テーブルの情報を結合
+      },
     });
 
-    if (!member) {
+    if (!memberData) {
       return NextResponse.json({ hasHousehold: false });
     }
 
+    // role が "OWNER" かどうかを判定
+    const isOwner = memberData.role === "OWNER";
+
     return NextResponse.json({
       hasHousehold: true,
-      household: member.household,
-      role: member.role,
+      householdId: memberData.householdId,
+      role: memberData.role, // "OWNER" または "MEMBER"
+      isOwner, // ← 代表者フラグ (boolean)
+      householdName: memberData.household?.name || "",
+      deadlineMessage: memberData.household?.deadlineMessage || "午後4時までに決めてね", // 👈 追加
+      household: memberData.household, // Header参照用オブジェクト
     });
-  } catch (error: unknown) {
-    console.error('世帯所属確認エラー:', error);
-    return NextResponse.json({ error: '世帯情報の取得に失敗しました。' }, { status: 500 });
+  } catch (err) {
+    console.error("Unexpected error:", err);
+    return NextResponse.json(
+      { error: "サーバーエラーが発生しました。" },
+      { status: 500 }
+    );
   }
 }

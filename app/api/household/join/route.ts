@@ -1,75 +1,49 @@
-import { NextResponse } from 'next/server';
-import { PrismaClient, HouseholdRole } from '@prisma/client';
-import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
-
-const prisma = new PrismaClient();
+import { NextResponse } from "next/server";
+import { createClient } from "@/utils/supabase/server";
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    const { code } = body;
-
-    if (!code || typeof code !== 'string') {
-      return NextResponse.json({ error: '招待コードを入力してください。' }, { status: 400 });
-    }
-
-    const cookieStore = await cookies();
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          getAll() { return cookieStore.getAll(); },
-          setAll() {},
-        },
-      }
-    );
-
+    const supabase = await createClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
+
     if (authError || !user) {
-      return NextResponse.json({ error: '認証されていません。' }, { status: 401 });
+      return NextResponse.json({ error: "認証されていません。" }, { status: 401 });
     }
 
-    const existingMember = await prisma.householdMember.findUnique({
-      where: { userId: user.id },
-    });
-    if (existingMember) {
-      return NextResponse.json({ error: 'すでに別の世帯に所属しています。' }, { status: 400 });
+    const { inviteCode } = await request.json();
+    if (!inviteCode) {
+      return NextResponse.json({ error: "招待コードが必要です。" }, { status: 400 });
     }
 
-    const invite = await prisma.householdInvite.findUnique({
-      where: { code: code.trim() },
-      include: { household: true },
-    });
+    // 1. 招待コードに対応する世帯を取得
+    const { data: household, error: fetchError } = await supabase
+      .from("households")
+      .select("id")
+      .eq("invite_code", inviteCode)
+      .single();
 
-    if (!invite) {
-      return NextResponse.json({ error: '無効な招待コードです。' }, { status: 404 });
+    if (fetchError || !household) {
+      return NextResponse.json({ error: "無効な招待コードです。" }, { status: 404 });
     }
 
-    const now = new Date();
-    if (invite.expiresAt < now || invite.revokedAt || invite.useCount >= invite.maxUses) {
-      return NextResponse.json({ error: 'この招待コードは有効期限切れ、または上限に達しています。' }, { status: 400 });
-    }
-
-    await prisma.$transaction(async (tx) => {
-      await tx.householdMember.create({
-        data: {
-          householdId: invite.householdId,
-          userId: user.id,
-          role: HouseholdRole.MEMBER,
+    // 2. 一般メンバー（MEMBER）として世帯に追加
+    const { error: joinError } = await supabase
+      .from("household_members")
+      .insert([
+        {
+          household_id: household.id,
+          user_id: user.id,
+          role: "MEMBER", // 後から参加した人は一般メンバー
         },
-      });
+      ]);
 
-      await tx.householdInvite.update({
-        where: { id: invite.id },
-        data: { useCount: { increment: 1 } },
-      });
-    });
+    if (joinError) {
+      return NextResponse.json({ error: "世帯への加入に失敗しました。" }, { status: 500 });
+    }
 
-    return NextResponse.json({ success: true, householdName: invite.household.name });
-  } catch (error: unknown) {
-    console.error('世帯参加エラー:', error);
-    return NextResponse.json({ error: '世帯への参加に失敗しました。' }, { status: 500 });
+    return NextResponse.json({ success: true });
+  } catch (err) {
+    console.error("Unexpected error:", err);
+    return NextResponse.json({ error: "サーバーエラーが発生しました。" }, { status: 500 });
   }
 }

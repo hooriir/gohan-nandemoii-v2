@@ -3,12 +3,22 @@ import type { Metadata, Viewport } from "next";
 
 export const metadata: Metadata = {
   title: "ごはん？なんでもいい〜",
-  description: "家族の好きなメニューだけを登録して検索表示できるアプリです。これを使えば、なんでもいい～と言われてもOK！",
+  description:
+    "家族の好きなメニューだけを登録して検索表示できるアプリです。これを使えば、なんでもいい～と言われてもOK！",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "なんでもいい",
+  },
 };
 
 export const viewport: Viewport = {
+  themeColor: "#54C7F3",
   width: "device-width",
   initialScale: 1,
+  maximumScale: 1,
+  userScalable: false, // スマホアプリっぽくピンチイン・アウト（拡大縮小）を無効化
 };
 
 export default function RootLayout({
