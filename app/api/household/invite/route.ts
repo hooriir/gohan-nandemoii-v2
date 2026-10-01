@@ -1,10 +1,8 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '@/lib/prisma';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import crypto from 'crypto';
-
-const prisma = new PrismaClient();
 
 export async function POST() {
   try {
@@ -50,7 +48,7 @@ export async function POST() {
 
     return NextResponse.json({ success: true, code: invite.code });
   } catch (error: unknown) {
-    console.error('招待コード発行エラー:', error);
+    console.error('招待コード発行エラー詳細:', error);
     return NextResponse.json({ error: '招待コードの発行に失敗しました。' }, { status: 500 });
   }
 }

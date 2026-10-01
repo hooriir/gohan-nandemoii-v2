@@ -1,15 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { createClient } from "@/utils/supabase/server";
-
-/**
- * 日本時間（JST）における「本日の00:00:00」のDateオブジェクトを算出する関数
- */
-function getTodayJst(): Date {
-  const now = new Date();
-  const jstString = now.toLocaleDateString("en-US", { timeZone: "Asia/Tokyo" });
-  return new Date(`${jstString} 00:00:00`);
-}
+import { getTodayJst } from "@/utils/date";
 
 export async function GET() {
   try {

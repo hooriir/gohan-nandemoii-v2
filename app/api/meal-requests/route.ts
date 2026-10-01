@@ -1,17 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { prisma } from "@/lib/prisma";
-
-/**
- * 日本時間（JST）における「本日の00:00:00」のDateオブジェクトを算出する関数
- */
-function getTodayJst(): Date {
-  const now = new Date();
-  // UTC時間から日本時間（JST: UTC+9）の年月日を取得
-  const jstString = now.toLocaleDateString("en-US", { timeZone: "Asia/Tokyo" });
-  // JSTの「00:00:00」としてDateオブジェクトを作成
-  return new Date(`${jstString} 00:00:00`);
-}
+import { getTodayJst } from "@/utils/date";
 
 // ==========================================
 // GET: 同じ世帯のメンバー全員の本日の希望一覧を取得
