@@ -3,45 +3,60 @@ import { prisma } from "@/lib/prisma";
 import Header from "@/components/Header";
 import { createClient } from "@/utils/supabase/server";
 import MenuListManager from "@/components/MenuListManager";
-import { getHouseholdContext } from "@/lib/household/auth";
+
+export const revalidate = 0;
 
 export default async function MenusPage() {
   const supabase = await createClient();
-  const { data: { user: supabaseUser } } = await supabase.auth.getUser();
+  const {
+    data: { user: supabaseUser },
+  } = await supabase.auth.getUser();
 
   if (!supabaseUser) {
     redirect("/login");
   }
 
   const userId = supabaseUser.id;
-  const displayName =
-    supabaseUser.user_metadata?.name ||
-    supabaseUser.email?.split("@")[0] ||
-    "ユーザー";
 
-  // 1. ユーザー情報のUpsert
-  await prisma.user.upsert({
-    where: { id: userId },
-    update: { email: supabaseUser.email || "" },
-    create: {
-      id: userId,
-      email: supabaseUser.email || "",
-      name: displayName,
-      password: "AUTH_USER",
-    },
-  });
-
-  // 2. 共通ヘルパーで世帯コンテキストを取得
-  const context = await getHouseholdContext(userId);
+  // 1. ユーザーの存在確認 & 世帯所属情報を並列で一括取得
+  const [dbUser, member] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true },
+    }),
+    prisma.householdMember.findFirst({
+      where: { userId },
+      select: { householdId: true },
+    }),
+  ]);
 
   // 世帯に所属していなければ世帯作成画面へリダイレクト
-  if (!context) {
+  if (!member) {
     redirect("/household/create");
+  }
+
+  // 2. DBユーザー未存在時のみ、バックグラウンド/最小限のUpsert処理
+  if (!dbUser) {
+    const displayName =
+      supabaseUser.user_metadata?.name ||
+      supabaseUser.email?.split("@")[0] ||
+      "ユーザー";
+
+    await prisma.user.upsert({
+      where: { id: userId },
+      update: { email: supabaseUser.email || "" },
+      create: {
+        id: userId,
+        email: supabaseUser.email || "",
+        name: displayName,
+        password: "AUTH_USER",
+      },
+    });
   }
 
   // 3. 世帯IDに紐づく料理一覧を取得
   const dishes = await prisma.dish.findMany({
-    where: { householdId: context.householdId },
+    where: { householdId: member.householdId },
     include: { tags: true },
     orderBy: { createdAt: "desc" },
   });

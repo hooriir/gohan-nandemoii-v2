@@ -4,29 +4,43 @@ import Image from "next/image";
 import Link from "next/link";
 import Header from "@/components/Header";
 import { redirect } from "next/navigation";
-import { getHouseholdContext } from "@/lib/household/auth";
+
+export const revalidate = 0;
 
 export default async function HistoryPage() {
   const supabase = await createClient();
-  const { data: { user: supabaseUser } } = await supabase.auth.getUser();
+  const {
+    data: { user: supabaseUser },
+  } = await supabase.auth.getUser();
 
-  if (!supabaseUser || !supabaseUser.id) {
+  if (!supabaseUser?.id) {
     redirect("/login");
   }
 
-  const userId = supabaseUser.id;
+  // 1. ユーザーの所属世帯を直接取得（軽量化）
+  const member = await prisma.householdMember.findFirst({
+    where: { userId: supabaseUser.id },
+    select: { householdId: true },
+  });
 
-  // 1. ユーザーが所属している世帯メンバー情報を取得
-  const context = await getHouseholdContext(userId);
-
-  if (!context) {
+  if (!member) {
     redirect("/household/create");
   }
 
+  // 2. 履歴データの取得（件数制限 + 必要なカラムのみ抽出）
   const logs = await prisma.dishShowLog.findMany({
-    where: { householdId: context.householdId },
-    include: {
-      dish: true,
+    where: { householdId: member.householdId },
+    take: 50, // 性能低下を防ぐため直近50件に制限
+    select: {
+      id: true,
+      keyword: true,
+      createdAt: true,
+      dish: {
+        select: {
+          name: true,
+          imageUrl: true,
+        },
+      },
     },
     orderBy: {
       createdAt: "desc",
@@ -36,11 +50,9 @@ export default async function HistoryPage() {
   return (
     <div className="bg-[#54C7F3] min-h-screen flex flex-col font-sans">
       <main className="flex-1 flex flex-col items-center py-8 px-4">
-
         <Header />
 
         <div className="bg-white rounded-2xl p-6 sm:p-8 shadow-xl max-w-2xl w-full">
-
           <h1 className="text-xl sm:text-2xl font-black text-[#54C7F3] mb-6 flex items-center justify-center gap-2 tracking-wider">
             これまでの提案履歴
           </h1>
@@ -109,7 +121,6 @@ export default async function HistoryPage() {
               })}
             </div>
           )}
-
         </div>
       </main>
     </div>
