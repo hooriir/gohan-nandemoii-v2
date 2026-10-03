@@ -53,7 +53,7 @@ erDiagram
         String householdId FK
         String createdById FK
         String code UK "招待コード"
-        Int maxUses "デフォルト: 5"
+        Int maxUses "デフォルト: 1"
         Int useCount
         DateTime expiresAt
         DateTime revokedAt

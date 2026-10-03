@@ -25,7 +25,7 @@ export default async function ProfilePage() {
   const member = await prisma.householdMember.findFirst({
     where: { userId: user.id },
     include: {
-      household: { select: { name: true } },
+      household: { select: { id: true, name: true } },
     },
   });
 
@@ -34,6 +34,8 @@ export default async function ProfilePage() {
     email: user.email || '',
     isGoogleUser: !!isGoogleUser,
     householdName: member?.household?.name || '',
+    hasHousehold: !!member,
+    role: member?.role || null,
   };
 
   return (

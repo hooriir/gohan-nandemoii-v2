@@ -94,6 +94,9 @@ export default async function FamilySummaryPage() {
     };
   });
 
+  // 1人でもリクエスト（希望・NG・なんでも等）を入力しているかチェック
+  const hasAnyRequest = membersRequests.some((m) => m.request !== null);
+
   const deadlineMessage =
     member.household.deadlineMessage || "午後4時までに決めてね";
 
@@ -186,7 +189,18 @@ export default async function FamilySummaryPage() {
             </div>
           ) : currentUserRole === "OWNER" ? (
             /* 未決定 且つ 代表者の場合 */
-            <MediateButton />
+            hasAnyRequest ? (
+              <MediateButton />
+            ) : (
+              <div className="bg-amber-50 p-4 rounded-2xl text-center border border-amber-100">
+                <p className="text-sm font-bold text-amber-700 mb-1">
+                  希望が入力されていません
+                </p>
+                <p className="text-xs text-amber-600">
+                  誰か一人以上が希望を入力すると、AI調停を実行できます。
+                </p>
+              </div>
+            )
           ) : (
             /* 未決定 且つ メンバーの場合 */
             <div className="bg-gray-50 p-4 rounded-2xl text-center border border-gray-100">

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import Header from "@/components/Header";
 
 export default function CreateHouseholdPage() {
@@ -87,6 +88,19 @@ export default function CreateHouseholdPage() {
             {loading ? "作成中..." : "世帯を作成してはじめる"}
           </button>
         </form>
+
+        {/* 招待コードで世帯に参加するボタンエリア */}
+        <div className="mt-6 pt-6 border-t border-gray-100 flex flex-col items-center">
+          <p className="text-xs text-gray-400 font-bold mb-3">
+            すでに作成済みの世帯がある場合
+          </p>
+          <Link
+            href="/household/join"
+            className="w-full py-3 bg-sky-50 hover:bg-sky-100 text-[#53cbfb] font-black text-center text-sm rounded-xl border border-sky-200 transition-colors"
+          >
+            または世帯に参加する（招待コードを入力）
+          </Link>
+        </div>
       </div>
     </div>
   );

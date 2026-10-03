@@ -24,7 +24,7 @@ export default function JoinHouseholdPage() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ code }),
+        body: JSON.stringify({ inviteCode: code }),
       });
 
       const data = await response.json();

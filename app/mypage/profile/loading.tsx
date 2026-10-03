@@ -9,7 +9,7 @@ export default function Loading() {
         <div className="flex-1 p-12 sm:p-16 w-full min-w-0 flex flex-col items-center justify-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#ffffff] mb-4"></div>
           <p className="text-white font-bold text-sm tracking-wider">
-            提案履歴を読み込んでいます...
+            プロフィール情報を読み込んでいます...
           </p>
         </div>
       </div>

@@ -34,7 +34,7 @@ export async function POST() {
     const inviteCode = crypto.randomBytes(4).toString('hex').toUpperCase();
 
     const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 7);
+    expiresAt.setMinutes(expiresAt.getMinutes() + 10);
 
     const invite = await prisma.householdInvite.create({
       data: {
@@ -42,7 +42,7 @@ export async function POST() {
         code: inviteCode,
         createdById: user.id,
         expiresAt,
-        maxUses: 10,
+        maxUses: 1,
       },
     });
 
