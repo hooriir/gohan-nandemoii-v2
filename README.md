@@ -1,7 +1,5 @@
 # ごはん？なんでもいい～
 
-<img width="400" height="auto" alt="スクリーンショット 2026-07-24 232617" src="https://github.com/user-attachments/assets/1cd21ffc-6241-4752-8b50-7631dd503b6a" />
-
 ## アプリURL
 https://gohan-nandemoii-v2.vercel.app/
 
@@ -33,7 +31,6 @@ https://gohan-nandemoii-v2.vercel.app/
 - **被り防止機能（履歴連携）**: 直近1週間に食べたごはん（メニュー）は検索結果から自動で除外
 
 ## 画面イメージ / 操作方法
-<img width="400" height="242" alt="操作方法" src="https://github.com/user-attachments/assets/a3347236-285e-48fe-960c-166c048e64ad" />
 
 1. デモアカウントでログインすると、世帯データと連携したメニュー検索画面が表示されます。
 2. キーワードを入力して赤いボタンをクリックすると、被り防止ロジックやGemini APIによる提案挙動をご確認いただけます。
