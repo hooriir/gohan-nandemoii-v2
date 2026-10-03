@@ -3,12 +3,7 @@ import Header from "@/components/Header";
 import { createClient } from "@/utils/supabase/server";
 import { prisma } from "@/lib/prisma";
 import MyDishForm from "@/components/my-dish/MyDishForm";
-
-function getTodayJst(): Date {
-  const now = new Date();
-  const jstString = now.toLocaleDateString("en-US", { timeZone: "Asia/Tokyo" });
-  return new Date(`${jstString} 00:00:00`);
-}
+import { getJstDateOnly } from "@/utils/date";
 
 export const revalidate = 0;
 
@@ -32,7 +27,7 @@ export default async function MyDishPage() {
   }
 
   const householdId = member.householdId;
-  const today = getTodayJst();
+  const today = getJstDateOnly();
 
   // 2. 本日の自分の希望リクエスト と 世帯のタグ（キーワード候補）を並列取得
   const [myRequest, tags] = await Promise.all([
@@ -40,7 +35,7 @@ export default async function MyDishPage() {
       where: {
         householdId,
         userId: user.id,
-        createdAt: { gte: today },
+        requestDate: today, // ← createdAt: { gte: today } から変更
       },
       include: {
         dish: { select: { id: true, name: true, imageUrl: true } },

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { createClient } from "@/utils/supabase/server";
-import { getTodayJst } from "@/utils/date";
+import { getJstDateOnly } from "@/utils/date";
 
 export async function GET() {
   try {
@@ -36,8 +36,8 @@ export async function GET() {
       },
     });
 
-    // 日本時間の本日（00:00:00）の日付を取得
-    const today = getTodayJst();
+    // 日本時間の本日（00:00:00Z）の日付オブジェクトを取得
+    const today = getJstDateOnly();
 
     const memberIds = householdMembers.map((m) => m.userId);
     const requests = await prisma.mealRequest.findMany({
@@ -101,8 +101,8 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { type, keyword, dishId } = body;
 
-    // 日本時間の本日（00:00:00）の日付を取得
-    const requestDate = getTodayJst();
+    // 日本時間の本日（00:00:00Z）の日付オブジェクトを取得
+    const requestDate = getJstDateOnly();
 
     const mealRequest = await prisma.mealRequest.upsert({
       where: {

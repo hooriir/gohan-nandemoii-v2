@@ -4,12 +4,7 @@ import { createClient } from "@/utils/supabase/server";
 import { prisma } from "@/lib/prisma";
 import DeadlineMessageEditor from "@/components/family-summary/DeadlineMessageEditor";
 import MediateButton from "@/components/family-summary/MediateButton";
-
-function getTodayJst(): Date {
-  const now = new Date();
-  const jstString = now.toLocaleDateString("en-US", { timeZone: "Asia/Tokyo" });
-  return new Date(`${jstString} 00:00:00`);
-}
+import { getJstDayRange, getJstDateOnly } from "@/utils/date";
 
 export const revalidate = 0;
 
@@ -38,14 +33,21 @@ export default async function FamilySummaryPage() {
 
   const householdId = member.householdId;
   const currentUserRole = member.role;
-  const today = getTodayJst();
 
-  // 2. 本日の決定ログと世帯メンバーの本日希望を並列取得
+  // 2. 本日のJST範囲（start, end）と日付文字列（today）を取得
+  const { start, end } = getJstDayRange();
+  const today = getJstDateOnly();
+
+  // 3. 本日の決定ログと世帯メンバーの本日希望を並列取得
   const [todayLog, householdMembers, todayRequests] = await Promise.all([
     prisma.dishShowLog.findFirst({
       where: {
         householdId,
-        createdAt: { gte: today },
+        // ✅ createdAt を { gte: start, lte: end } に置き換え
+        createdAt: {
+          gte: start,
+          lte: end,
+        },
       },
       include: {
         dish: { select: { id: true, name: true, imageUrl: true } },
@@ -61,7 +63,7 @@ export default async function FamilySummaryPage() {
     prisma.mealRequest.findMany({
       where: {
         householdId,
-        createdAt: { gte: today },
+        requestDate: today,
       },
       include: {
         dish: { select: { name: true } },
@@ -71,7 +73,7 @@ export default async function FamilySummaryPage() {
   ]);
 
   // メンバーごとの最新リクエストをマッピング
-  const memberRequestMap = new Map<string, typeof todayRequests[0]>();
+  const memberRequestMap = new Map<string, (typeof todayRequests)[0]>();
   for (const req of todayRequests) {
     if (!memberRequestMap.has(req.userId)) {
       memberRequestMap.set(req.userId, req);

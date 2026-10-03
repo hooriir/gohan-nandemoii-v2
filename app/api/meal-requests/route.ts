@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { prisma } from "@/lib/prisma";
-import { getTodayJst } from "@/utils/date";
+import { getJstDateOnly } from "@/utils/date";
 
 // ==========================================
 // GET: 同じ世帯のメンバー全員の本日の希望一覧を取得
@@ -27,8 +27,8 @@ export async function GET() {
       return NextResponse.json({ error: "世帯に所属していません" }, { status: 400 });
     }
 
-    // 2. 日本時間の本日（00:00:00）の日付を取得
-    const today = getTodayJst();
+    // 2. 日本時間の本日（00:00:00Z）の日付オブジェクトを取得
+    const today = getJstDateOnly();
 
     // 3. 同じ世帯の全メンバー情報と本日の希望（MealRequest）を並列処理で取得
     const [members, todayRequests] = await Promise.all([
@@ -112,8 +112,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "世帯に所属していません" }, { status: 400 });
     }
 
-    // 日本時間の本日（00:00:00）の日付を取得
-    const today = getTodayJst();
+    // 日本時間の本日（00:00:00Z）の日付オブジェクトを取得
+    const today = getJstDateOnly();
 
     const mealRequest = await prisma.mealRequest.upsert({
       where: {

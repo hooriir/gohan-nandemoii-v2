@@ -4,15 +4,7 @@ import Header from "@/components/Header";
 import { createClient } from "@/utils/supabase/server";
 import { prisma } from "@/lib/prisma";
 import ResetButton from "@/components/ResetButton";
-
-/**
- * 日本時間（JST）の00:00:00を取得
- */
-function getTodayJst(): Date {
-  const now = new Date();
-  const jstString = now.toLocaleDateString("en-US", { timeZone: "Asia/Tokyo" });
-  return new Date(`${jstString} 00:00:00`);
-}
+import { getJstDayRange } from "@/utils/date";
 
 export const revalidate = 0; // 常に最新データを取得
 
@@ -29,7 +21,7 @@ export default async function HomePage() {
   }
 
   // 2. サーバー側で世帯情報・決定ログを並列で一括取得（1回のアクセスで完了）
-  const today = getTodayJst();
+  const { start, end } = getJstDayRange();
 
   const [member, todayLog] = await Promise.all([
     prisma.householdMember.findFirst({
@@ -43,7 +35,10 @@ export default async function HomePage() {
             some: { userId: user.id },
           },
         },
-        createdAt: { gte: today },
+        createdAt: {
+          gte: start,
+          lte: end,
+        },
       },
       include: {
         dish: {
