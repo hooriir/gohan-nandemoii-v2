@@ -1,6 +1,10 @@
 # データモデル定義書 (gohan-nandemoii-v2)
 
+> 最終更新日: 2026-10-03
+
 本書は、`gohan-nandemoii-v2` におけるデータベース構造（`prisma/schema.prisma` 拠拠）、ER図、テーブル定義、および制約（Key、Index、リレーション）を定義するドキュメントです。
+
+各機能要件との対応については [02_機能要件一覧_gohan-nandemoii-v2.md](./02_機能要件一覧_gohan-nandemoii-v2.md)、APIでの利用箇所については [04_API仕様_gohan-nandemoii-v2.md](./04_API仕様_gohan-nandemoii-v2.md) を参照してください。
 
 ---
 
@@ -95,4 +99,3 @@ erDiagram
         DateTime createdAt
         DateTime updatedAt
     }
-```
