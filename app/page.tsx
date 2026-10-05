@@ -1,66 +1,61 @@
 import { redirect } from "next/navigation";
 import Image from "next/image";
 import Header from "@/components/Header";
-import { createClient } from "@/utils/supabase/server";
 import { prisma } from "@/lib/prisma";
 import ResetButton from "@/components/ResetButton";
 import { getJstDayRange } from "@/utils/date";
+import { getCurrentUserContext } from "@/lib/getCurrentUserContext";
 
 export const revalidate = 0; // 常に最新データを取得
 
 export default async function HomePage() {
-  // 1. サーバー側で認証チェック（高速）
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // 1. サーバー側で認証・世帯文脈を取得（cache()によりリクエスト内1回実行）
+  const userContext = await getCurrentUserContext();
 
   // 未ログインの場合はログイン画面へ
-  if (!user) {
+  if (!userContext) {
     redirect("/login");
   }
 
-  // 2. サーバー側で世帯情報・決定ログを並列で一括取得（1回のアクセスで完了）
-  const { start, end } = getJstDayRange();
-
-  const [member, todayLog] = await Promise.all([
-    prisma.householdMember.findFirst({
-      where: { userId: user.id },
-      select: { householdId: true, role: true },
-    }),
-    prisma.dishShowLog.findFirst({
-      where: {
-        household: {
-          members: {
-            some: { userId: user.id },
-          },
-        },
-        createdAt: {
-          gte: start,
-          lte: end,
-        },
-      },
-      include: {
-        dish: {
-          select: { id: true, name: true, imageUrl: true },
-        },
-      },
-      orderBy: { createdAt: "desc" },
-    }),
-  ]);
-
   // 世帯未所属の場合は世帯作成へ
-  if (!member) {
+  if (!userContext.householdName) {
     redirect("/household/create");
   }
 
-  const currentUserRole = member.role;
+  // 2. 本日の決定ログを取得
+  const { start, end } = getJstDayRange();
+
+  const todayLog = await prisma.dishShowLog.findFirst({
+    where: {
+      household: {
+        members: {
+          some: { userId: userContext.user.id },
+        },
+      },
+      createdAt: {
+        gte: start,
+        lte: end,
+      },
+    },
+    include: {
+      dish: {
+        select: { id: true, name: true, imageUrl: true },
+      },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  const headerProps = {
+    userName: userContext.userName,
+    householdName: userContext.householdName,
+    isOwner: userContext.isOwner,
+  };
 
   // 【パターン A】本日のメニューが決定している場合
   if (todayLog) {
     return (
       <div className="bg-[#53cbfb] min-h-screen flex flex-col items-center px-4 text-white font-sans select-none pb-20">
-        <Header />
+        <Header {...headerProps} />
 
         <div className="w-full max-w-xl flex flex-col items-center mt-6">
           <h1 className="text-xl md:text-2xl font-black mb-6 tracking-wider">
@@ -102,7 +97,7 @@ export default async function HomePage() {
           </div>
 
           {/* 代表者のみリセットボタン（Client Component） */}
-          {currentUserRole === "OWNER" && <ResetButton />}
+          {userContext.isOwner && <ResetButton />}
         </div>
       </div>
     );
@@ -111,7 +106,7 @@ export default async function HomePage() {
   // 【パターン B】今日のごはん未決定時
   return (
     <div className="bg-[#53cbfb] min-h-screen flex flex-col items-center px-4 text-white font-sans select-none pb-20">
-      <Header />
+      <Header {...headerProps} />
 
       <div className="w-full max-w-xl flex flex-col items-center mt-6">
         <h1 className="text-xl md:text-2xl font-black mb-6 tracking-wider">
