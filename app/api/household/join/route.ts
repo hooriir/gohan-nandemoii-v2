@@ -26,7 +26,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const trimmedCode = inviteCode.trim();
+    const trimmedCode = inviteCode.trim().toUpperCase();
 
     // 2. Prisma + HouseholdInvite 参照
     const invite = await prisma.householdInvite.findUnique({
