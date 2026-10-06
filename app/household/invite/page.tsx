@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import Header from "@/components/Header";
 
@@ -8,6 +8,38 @@ export default function InvitePage() {
   const [code, setCode] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
+
+  // Header表示用の状態（undefinedを許容せず、null / boolean で初期化）
+  const [userContext, setUserContext] = useState<{
+    userName: string | null;
+    householdName: string | null;
+    isOwner: boolean;
+  }>({
+    userName: null,
+    householdName: null,
+    isOwner: false,
+  });
+
+  useEffect(() => {
+    // クライアント側でユーザーおよび世帯情報を取得
+    const fetchContext = async () => {
+      try {
+        const res = await fetch("/api/user/context");
+        if (res.ok) {
+          const data = await res.json();
+          setUserContext({
+            userName: data.userName ?? null,
+            householdName: data.householdName ?? null,
+            isOwner: data.isOwner ?? false,
+          });
+        }
+      } catch (err) {
+        console.error("Failed to fetch user context:", err);
+      }
+    };
+
+    fetchContext();
+  }, []);
 
   const generateInviteCode = async () => {
     setLoading(true);
@@ -36,7 +68,11 @@ export default function InvitePage() {
 
   return (
     <div className="bg-[#53cbfb] min-h-screen flex flex-col items-center justify-start p-4 text-white font-sans">
-      <Header />
+      <Header
+        userName={userContext.userName}
+        householdName={userContext.householdName}
+        isOwner={userContext.isOwner}
+      />
 
       <div className="w-full max-w-md bg-white rounded-3xl p-8 shadow-2xl text-gray-800 mt-12 text-center">
         <h2 className="text-2xl font-black mb-2 text-slate-800">

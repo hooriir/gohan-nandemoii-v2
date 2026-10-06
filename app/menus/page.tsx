@@ -1,60 +1,36 @@
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import Header from "@/components/Header";
-import { createClient } from "@/utils/supabase/server";
 import MenuListManager from "@/components/MenuListManager";
+import { getCurrentUserContext } from "@/lib/getCurrentUserContext";
 
 export const revalidate = 0;
 
 export default async function MenusPage() {
-  const supabase = await createClient();
-  const {
-    data: { user: supabaseUser },
-  } = await supabase.auth.getUser();
+  // Server Component 用ヘルパーからユーザーコンテキストを取得
+  const userContext = await getCurrentUserContext();
 
-  if (!supabaseUser) {
+  // 未ログインの場合はログインページへ
+  if (!userContext || !userContext.user) {
     redirect("/login");
   }
 
-  const userId = supabaseUser.id;
+  // 世帯に所属していない場合は世帯作成ページへ
+  if (!userContext.householdName) {
+    redirect("/household/create");
+  }
 
-  // 1. ユーザーの存在確認 & 世帯所属情報を並列で一括取得
-  const [dbUser, member] = await Promise.all([
-    prisma.user.findUnique({
-      where: { id: userId },
-      select: { id: true },
-    }),
-    prisma.householdMember.findFirst({
-      where: { userId },
-      select: { householdId: true },
-    }),
-  ]);
+  // ユーザーの世帯所属情報を取得
+  const member = await prisma.householdMember.findFirst({
+    where: { userId: userContext.user.id },
+    select: { householdId: true },
+  });
 
-  // 世帯に所属していなければ世帯作成画面へリダイレクト
   if (!member) {
     redirect("/household/create");
   }
 
-  // 2. DBユーザー未存在時のみ、バックグラウンド/最小限のUpsert処理
-  if (!dbUser) {
-    const displayName =
-      supabaseUser.user_metadata?.name ||
-      supabaseUser.email?.split("@")[0] ||
-      "ユーザー";
-
-    await prisma.user.upsert({
-      where: { id: userId },
-      update: { email: supabaseUser.email || "" },
-      create: {
-        id: userId,
-        email: supabaseUser.email || "",
-        name: displayName,
-        password: "AUTH_USER",
-      },
-    });
-  }
-
-  // 3. 世帯IDに紐づく料理一覧を取得
+  // 世帯IDに紐づく料理一覧を取得
   const dishes = await prisma.dish.findMany({
     where: { householdId: member.householdId },
     include: { tags: true },
@@ -63,7 +39,11 @@ export default async function MenusPage() {
 
   return (
     <div className="bg-brand-bg min-h-screen p-4 sm:p-8 flex flex-col items-center font-sans">
-      <Header />
+      <Header
+        userName={userContext.userName}
+        householdName={userContext.householdName}
+        isOwner={userContext.isOwner}
+      />
 
       <div className="w-full max-w-[900px] flex flex-row gap-6 items-start justify-center">
         <div className="flex-1 bg-white rounded-3xl shadow-xl p-6 sm:p-10 border border-slate-100 w-full min-w-0">

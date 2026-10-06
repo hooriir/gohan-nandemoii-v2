@@ -1,30 +1,25 @@
 import { redirect } from "next/navigation";
 import Header from "@/components/Header";
-import { createClient } from "@/utils/supabase/server";
 import { prisma } from "@/lib/prisma";
 import DeadlineMessageEditor from "@/components/family-summary/DeadlineMessageEditor";
 import MediateButton from "@/components/family-summary/MediateButton";
 import { getJstDayRange, getJstDateOnly } from "@/utils/date";
+import { getCurrentUserContext } from "@/lib/getCurrentUserContext";
 
 export const revalidate = 0;
 
 export default async function FamilySummaryPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // 1. サーバー側で認証・世帯文脈を取得
+  const userContext = await getCurrentUserContext();
 
-  if (!user) {
+  if (!userContext) {
     redirect("/login");
   }
 
-  // 1. 自分の所属世帯を取得
+  // 2. 自分の所属世帯情報（householdId）を取得
   const member = await prisma.householdMember.findFirst({
-    where: { userId: user.id },
-    include: {
-      household: true,
-      user: { select: { name: true } },
-    },
+    where: { userId: userContext.user.id },
+    select: { householdId: true },
   });
 
   if (!member) {
@@ -32,45 +27,49 @@ export default async function FamilySummaryPage() {
   }
 
   const householdId = member.householdId;
-  const currentUserRole = member.role;
+  const { user, isOwner, userName, householdName } = userContext;
 
-  // 2. 本日のJST範囲（start, end）と日付文字列（today）を取得
+  // 3. 本日のJST範囲（start, end）と日付文字列（today）を取得
   const { start, end } = getJstDayRange();
   const today = getJstDateOnly();
 
-  // 3. 本日の決定ログと世帯メンバーの本日希望を並列取得
-  const [todayLog, householdMembers, todayRequests] = await Promise.all([
-    prisma.dishShowLog.findFirst({
-      where: {
-        householdId,
-        // ✅ createdAt を { gte: start, lte: end } に置き換え
-        createdAt: {
-          gte: start,
-          lte: end,
+  // 4. 世帯メッセージ、本日の決定ログ、世帯メンバーの本日希望を並列取得
+  const [household, todayLog, householdMembers, todayRequests] =
+    await Promise.all([
+      prisma.household.findUnique({
+        where: { id: householdId },
+        select: { deadlineMessage: true },
+      }),
+      prisma.dishShowLog.findFirst({
+        where: {
+          householdId,
+          createdAt: {
+            gte: start,
+            lte: end,
+          },
         },
-      },
-      include: {
-        dish: { select: { id: true, name: true, imageUrl: true } },
-      },
-      orderBy: { createdAt: "desc" },
-    }),
-    prisma.householdMember.findMany({
-      where: { householdId },
-      include: {
-        user: { select: { id: true, name: true } },
-      },
-    }),
-    prisma.mealRequest.findMany({
-      where: {
-        householdId,
-        requestDate: today,
-      },
-      include: {
-        dish: { select: { name: true } },
-      },
-      orderBy: { createdAt: "desc" },
-    }),
-  ]);
+        include: {
+          dish: { select: { id: true, name: true, imageUrl: true } },
+        },
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.householdMember.findMany({
+        where: { householdId },
+        include: {
+          user: { select: { id: true, name: true } },
+        },
+      }),
+      prisma.mealRequest.findMany({
+        where: {
+          householdId,
+          requestDate: today,
+        },
+        include: {
+          dish: { select: { name: true } },
+        },
+        orderBy: { createdAt: "desc" },
+      }),
+    ]);
 
   // メンバーごとの最新リクエストをマッピング
   const memberRequestMap = new Map<string, (typeof todayRequests)[0]>();
@@ -100,11 +99,15 @@ export default async function FamilySummaryPage() {
   const hasAnyRequest = membersRequests.some((m) => m.request !== null);
 
   const deadlineMessage =
-    member.household.deadlineMessage || "午後4時までに決めてね";
+    household?.deadlineMessage || "午後4時までに決めてね";
 
   return (
     <div className="bg-[#53cbfb] min-h-screen flex flex-col items-center px-4 text-white font-sans select-none pb-20">
-      <Header />
+      <Header
+        userName={userName}
+        householdName={householdName}
+        isOwner={isOwner}
+      />
 
       <div className="w-full max-w-xl flex flex-col items-center mt-6">
         <h1 className="text-2xl md:text-3xl font-black mb-6 tracking-wider text-white">
@@ -116,7 +119,7 @@ export default async function FamilySummaryPage() {
           {/* メッセージ表示 & 編集エリア */}
           <DeadlineMessageEditor
             initialMessage={deadlineMessage}
-            isOwner={currentUserRole === "OWNER"}
+            isOwner={isOwner}
           />
 
           <div className="space-y-4 mb-8">
@@ -189,7 +192,7 @@ export default async function FamilySummaryPage() {
                 決定メニューはホーム画面（トップ）からいつでも確認できます。
               </p>
             </div>
-          ) : currentUserRole === "OWNER" ? (
+          ) : isOwner ? (
             /* 未決定 且つ 代表者の場合 */
             hasAnyRequest ? (
               <MediateButton />

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Header from "@/components/Header";
@@ -10,6 +10,38 @@ export default function JoinHouseholdPage() {
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Header表示用の状態（TypeScript型エラー回避のため明示的に型と初期値を設定）
+  const [userContext, setUserContext] = useState<{
+    userName: string | null;
+    householdName: string | null;
+    isOwner: boolean;
+  }>({
+    userName: null,
+    householdName: null,
+    isOwner: false,
+  });
+
+  useEffect(() => {
+    // クライアント側でユーザーおよび世帯情報を取得
+    const fetchContext = async () => {
+      try {
+        const res = await fetch("/api/user/context");
+        if (res.ok) {
+          const data = await res.json();
+          setUserContext({
+            userName: data.userName ?? null,
+            householdName: data.householdName ?? null,
+            isOwner: data.isOwner ?? false,
+          });
+        }
+      } catch (err) {
+        console.error("Failed to fetch user context:", err);
+      }
+    };
+
+    fetchContext();
+  }, []);
 
   const handleJoin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,7 +80,11 @@ export default function JoinHouseholdPage() {
 
   return (
     <div className="bg-[#53cbfb] min-h-screen flex flex-col items-center justify-start p-4 text-white font-sans">
-      <Header />
+      <Header
+        userName={userContext.userName}
+        householdName={userContext.householdName}
+        isOwner={userContext.isOwner}
+      />
 
       <div className="w-full max-w-md bg-white rounded-3xl p-8 shadow-2xl text-gray-800 mt-12">
         <h2 className="text-2xl font-black text-center mb-2 text-slate-800">
@@ -82,8 +118,7 @@ export default function JoinHouseholdPage() {
           <button
             type="submit"
             disabled={loading}
-            app-disabled-style="true"
-            className="w-full py-4 bg-[#e60012] hover:bg-[#c4000f] disabled:bg-gray-400 text-white font-black text-lg rounded-2xl shadow-lg transition-transform active:scale-95"
+            className="w-full py-4 bg-[#e60012] hover:bg-[#c4000f] disabled:bg-gray-400 text-white font-black text-lg rounded-2xl shadow-lg transition-transform active:scale-95 cursor-pointer"
           >
             {loading ? "参加中..." : "世帯に参加する"}
           </button>

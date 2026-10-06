@@ -1,20 +1,21 @@
 import { redirect } from 'next/navigation';
 import Header from '@/components/Header';
-import { createClient } from '@/utils/supabase/server';
 import { prisma } from '@/lib/prisma';
 import ProfileForm from '@/components/profile/ProfileForm';
+import { getCurrentUserContext } from '@/lib/getCurrentUserContext';
 
 export const revalidate = 0;
 
 export default async function ProfilePage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Server Component 用ヘルパーからユーザーコンテキストを取得
+  const userContext = await getCurrentUserContext();
 
-  if (!user) {
+  // 未ログインの場合はログインページへ
+  if (!userContext || !userContext.user) {
     redirect('/login');
   }
+
+  const user = userContext.user;
 
   // Googleプロバイダー判定
   const isGoogleUser =
@@ -30,10 +31,10 @@ export default async function ProfilePage() {
   });
 
   const initialData = {
-    name: user.user_metadata?.name || '',
+    name: userContext.userName || user.user_metadata?.name || '',
     email: user.email || '',
     isGoogleUser: !!isGoogleUser,
-    householdName: member?.household?.name || '',
+    householdName: userContext.householdName || member?.household?.name || '',
     hasHousehold: !!member,
     role: member?.role || null,
   };
@@ -41,7 +42,11 @@ export default async function ProfilePage() {
   return (
     <div className="bg-[#54C7F3] min-h-screen flex flex-col font-sans">
       <main className="flex-1 flex flex-col items-center py-8 px-4">
-        <Header />
+        <Header
+          userName={userContext.userName}
+          householdName={userContext.householdName}
+          isOwner={userContext.isOwner}
+        />
 
         <div className="flex flex-col md:flex-row gap-6 sm:gap-8 max-w-4xl w-full px-4 items-stretch justify-center">
           <ProfileForm initialData={initialData} />

@@ -1,25 +1,29 @@
 import { redirect } from "next/navigation";
 import Header from "@/components/Header";
-import { createClient } from "@/utils/supabase/server";
 import { prisma } from "@/lib/prisma";
 import MyDishForm from "@/components/my-dish/MyDishForm";
 import { getJstDateOnly } from "@/utils/date";
+import { getCurrentUserContext } from "@/lib/getCurrentUserContext";
 
 export const revalidate = 0;
 
 export default async function MyDishPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Server Component 用ヘルパーからユーザーコンテキストを取得
+  const userContext = await getCurrentUserContext();
 
-  if (!user) {
+  // 未ログインの場合はログインページへ
+  if (!userContext || !userContext.user) {
     redirect("/login");
+  }
+
+  // 世帯に所属していない場合は世帯作成ページへ
+  if (!userContext.householdName) {
+    redirect("/household/create");
   }
 
   // 1. 自分の所属世帯を取得
   const member = await prisma.householdMember.findFirst({
-    where: { userId: user.id },
+    where: { userId: userContext.user.id },
   });
 
   if (!member) {
@@ -34,8 +38,8 @@ export default async function MyDishPage() {
     prisma.mealRequest.findFirst({
       where: {
         householdId,
-        userId: user.id,
-        requestDate: today, // ← createdAt: { gte: today } から変更
+        userId: userContext.user.id,
+        requestDate: today,
       },
       include: {
         dish: { select: { id: true, name: true, imageUrl: true } },
@@ -72,7 +76,11 @@ export default async function MyDishPage() {
 
   return (
     <div className="bg-[#53cbfb] min-h-screen flex flex-col items-center px-4 text-white font-sans select-none pb-20">
-      <Header />
+      <Header
+        userName={userContext.userName}
+        householdName={userContext.householdName}
+        isOwner={userContext.isOwner}
+      />
 
       <div className="w-full max-w-xl flex flex-col items-center mt-6">
         <h1 className="text-xl md:text-2xl font-black mb-6 tracking-wider">
@@ -83,7 +91,7 @@ export default async function MyDishPage() {
           <MyDishForm
             initialResult={initialResult}
             suggestionDishNames={suggestionDishNames}
-            userId={user.id}
+            userId={userContext.user.id}
           />
         </div>
       </div>

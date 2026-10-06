@@ -1,15 +1,40 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Header from "@/components/Header";
+import { createClient } from "@/utils/supabase/client";
 
 export default function CreateHouseholdPage() {
   const router = useRouter();
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Header表示用の状態
+  const [userName, setUserName] = useState<string>("");
+
+  useEffect(() => {
+    // ログインユーザー名等の表示用データ取得
+    const fetchUser = async () => {
+      const supabase = createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (user) {
+        setUserName(
+          user.user_metadata?.name ||
+            user.user_metadata?.full_name ||
+            user.email?.split("@")[0] ||
+            "ユーザー"
+        );
+      }
+    };
+
+    fetchUser();
+  }, []);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,7 +74,11 @@ export default function CreateHouseholdPage() {
 
   return (
     <div className="bg-[#53cbfb] min-h-screen flex flex-col items-center justify-start p-4 text-white font-sans">
-      <Header />
+      <Header
+        userName={userName}
+        householdName={null}
+        isOwner={false}
+      />
 
       <div className="w-full max-w-md bg-white rounded-3xl p-8 shadow-2xl text-gray-800 mt-12">
         <h2 className="text-2xl font-black text-center mb-2 text-slate-800">

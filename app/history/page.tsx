@@ -1,25 +1,23 @@
 import { prisma } from "@/lib/prisma";
-import { createClient } from "@/utils/supabase/server";
 import Image from "next/image";
 import Link from "next/link";
 import Header from "@/components/Header";
 import { redirect } from "next/navigation";
+import { getCurrentUserContext } from "@/lib/getCurrentUserContext";
 
 export const revalidate = 0;
 
 export default async function HistoryPage() {
-  const supabase = await createClient();
-  const {
-    data: { user: supabaseUser },
-  } = await supabase.auth.getUser();
+  // 1. サーバー側で認証・世帯文脈を取得
+  const userContext = await getCurrentUserContext();
 
-  if (!supabaseUser?.id) {
+  if (!userContext) {
     redirect("/login");
   }
 
-  // 1. ユーザーの所属世帯を直接取得（軽量化）
+  // 2. ユーザーの所属世帯を直接取得
   const member = await prisma.householdMember.findFirst({
-    where: { userId: supabaseUser.id },
+    where: { userId: userContext.user.id },
     select: { householdId: true },
   });
 
@@ -27,7 +25,9 @@ export default async function HistoryPage() {
     redirect("/household/create");
   }
 
-  // 2. 履歴データの取得（件数制限 + 必要なカラムのみ抽出）
+  const { isOwner, userName, householdName } = userContext;
+
+  // 3. 履歴データの取得（件数制限 + 必要なカラムのみ抽出）
   const logs = await prisma.dishShowLog.findMany({
     where: { householdId: member.householdId },
     take: 50, // 性能低下を防ぐため直近50件に制限
@@ -50,7 +50,11 @@ export default async function HistoryPage() {
   return (
     <div className="bg-[#54C7F3] min-h-screen flex flex-col font-sans">
       <main className="flex-1 flex flex-col items-center py-8 px-4">
-        <Header />
+        <Header
+          userName={userName}
+          householdName={householdName}
+          isOwner={isOwner}
+        />
 
         <div className="bg-white rounded-2xl p-6 sm:p-8 shadow-xl max-w-2xl w-full">
           <h1 className="text-xl sm:text-2xl font-black text-[#54C7F3] mb-6 flex items-center justify-center gap-2 tracking-wider">
