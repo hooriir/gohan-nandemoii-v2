@@ -10,13 +10,19 @@ type HeaderProps = {
   userName: string | null;
   householdName: string | null;
   isOwner: boolean;
+  isLoading?: boolean; // 👈 追加: ローディング判定フラグ
 };
 
-export default function Header({ userName, householdName, isOwner }: HeaderProps) {
+export default function Header({
+  userName,
+  householdName,
+  isOwner,
+  isLoading = false,
+}: HeaderProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false); // モバイルメニュー開閉状態
 
   const pathname = usePathname();
-  const isCenteredMode = pathname === "/" && !userName;
+  const isCenteredMode = pathname === "/" && !userName && !isLoading;
 
   // メニューを閉じる関数
   const closeMenu = () => {
@@ -45,7 +51,9 @@ export default function Header({ userName, householdName, isOwner }: HeaderProps
   return (
     <header
       className={`w-full max-w-[1000px] flex flex-col relative px-4 select-none ${
-        isCenteredMode ? "items-center justify-center min-h-[75vh]" : "items-center mb-6 mt-4"
+        isCenteredMode
+          ? "items-center justify-center min-h-[75vh]"
+          : "items-center mb-6 mt-4"
       }`}
     >
       <div
@@ -56,11 +64,18 @@ export default function Header({ userName, householdName, isOwner }: HeaderProps
         {/* 左側：ロゴ・ユーザー名エリア */}
         <div
           className={`flex flex-col shrink-0 ${
-            isCenteredMode ? "justify-center text-center items-center" : "items-start text-left"
+            isCenteredMode
+              ? "justify-center text-center items-center"
+              : "items-start text-left"
           }`}
         >
-          <p className="text-white text-sm md:text-base font-bold tracking-wider mb-1 drop-shadow-sm min-h-[1.5rem]">
-            {`${displayName}の`}
+          {/* ローディング中はスケルトンUI、完了後は名前を表示 */}
+          <p className="text-white text-sm md:text-base font-bold tracking-wider mb-1 drop-shadow-sm min-h-[1.5rem] flex items-center">
+            {isLoading ? (
+              <span className="inline-block w-36 h-5 bg-white/30 animate-pulse rounded-md" />
+            ) : (
+              `${displayName}の`
+            )}
           </p>
           <Link href="/" prefetch={false}>
             <Image
@@ -77,7 +92,14 @@ export default function Header({ userName, householdName, isOwner }: HeaderProps
 
         {/* 右側：PC表示時の横並びボタンエリア (md以上で表示) */}
         <div className="hidden md:flex items-center justify-center shrink-0 min-h-[85px]">
-          {isLoggedIn ? (
+          {isLoading ? (
+            /* ローディング中のボタンスケルトン */
+            <div className="flex items-center gap-2.5">
+              <div className="bg-white/40 animate-pulse rounded-2xl w-20 h-20" />
+              <div className="bg-white/40 animate-pulse rounded-2xl w-20 h-20" />
+              <div className="bg-white/40 animate-pulse rounded-2xl w-20 h-20" />
+            </div>
+          ) : isLoggedIn ? (
             <div className="flex items-center gap-2.5">
               <Link
                 href="/"
@@ -90,7 +112,8 @@ export default function Header({ userName, householdName, isOwner }: HeaderProps
                     width={100}
                     height={165}
                     alt="今日のごはん"
-                    className="object-contain w-full h-full"
+                    style={{ width: "auto", height: "100%" }}
+                    className="object-contain"
                     priority
                   />
                 </div>
@@ -110,7 +133,8 @@ export default function Header({ userName, householdName, isOwner }: HeaderProps
                     width={100}
                     height={100}
                     alt="みんなのごはん"
-                    className="object-contain w-full h-full"
+                    style={{ width: "auto", height: "100%" }}
+                    className="object-contain"
                     priority
                   />
                 </div>
@@ -130,7 +154,8 @@ export default function Header({ userName, householdName, isOwner }: HeaderProps
                     width={84}
                     height={74}
                     alt="プロフィール"
-                    className="object-contain w-full h-full"
+                    style={{ width: "auto", height: "100%" }}
+                    className="object-contain"
                     priority
                   />
                 </div>
@@ -151,7 +176,8 @@ export default function Header({ userName, householdName, isOwner }: HeaderProps
                       width={130}
                       height={74}
                       alt="ごはん登録"
-                      className="object-contain w-full h-full"
+                      style={{ width: "auto", height: "100%" }}
+                      className="object-contain"
                       priority
                     />
                   </div>
@@ -173,7 +199,8 @@ export default function Header({ userName, householdName, isOwner }: HeaderProps
                       width={100}
                       height={165}
                       alt="提案履歴"
-                      className="object-contain w-full h-full"
+                      style={{ width: "auto", height: "100%" }}
+                      className="object-contain"
                       priority
                     />
                   </div>
@@ -194,7 +221,8 @@ export default function Header({ userName, householdName, isOwner }: HeaderProps
                     alt="ログアウト"
                     width={140}
                     height={32}
-                    className="object-contain w-full h-full"
+                    style={{ width: "auto", height: "100%" }}
+                    className="object-contain"
                     priority
                   />
                 </div>
@@ -216,7 +244,8 @@ export default function Header({ userName, householdName, isOwner }: HeaderProps
                     width={130}
                     height={74}
                     alt="新規登録"
-                    className="object-contain w-full h-full"
+                    style={{ width: "auto", height: "100%" }}
+                    className="object-contain"
                     priority
                   />
                 </div>
@@ -235,7 +264,8 @@ export default function Header({ userName, householdName, isOwner }: HeaderProps
                     alt="ログイン"
                     width={140}
                     height={32}
-                    className="object-contain w-full h-full"
+                    style={{ width: "auto", height: "100%" }}
+                    className="object-contain"
                     priority
                   />
                 </div>
@@ -262,18 +292,15 @@ export default function Header({ userName, householdName, isOwner }: HeaderProps
         )}
       </div>
 
-      {/* スマホ用 ドロワーメニュー（背景オーバレイ ＋ 右側からスライドイン） */}
+      {/* スマホ用 ドロワーメニュー */}
       {isMenuOpen && (
         <div className="fixed inset-0 z-50 flex justify-end md:hidden">
-          {/* 暗い背景 */}
           <div
             className="fixed inset-0 bg-black/40 backdrop-blur-sm"
             onClick={closeMenu}
           />
 
-          {/* 右スライドメニュー本体 */}
           <div className="relative w-72 max-w-[80vw] bg-[#54C7F3] h-full shadow-2xl p-6 flex flex-col z-10 overflow-y-auto">
-            {/* 閉じるボタン (×) */}
             <button
               type="button"
               className="self-end text-white text-3xl font-bold p-2 mb-4 hover:opacity-80 focus:outline-none"
@@ -283,11 +310,13 @@ export default function Header({ userName, householdName, isOwner }: HeaderProps
               ✕
             </button>
 
-            {/* メニューアイテム一覧 */}
             <div className="flex flex-col gap-3">
-              {isLoggedIn ? (
+              {isLoading ? (
+                <div className="text-white font-bold text-center py-4 animate-pulse">
+                  読み込み中...
+                </div>
+              ) : isLoggedIn ? (
                 <>
-                  {/* 今日のごはん */}
                   <Link
                     href="/"
                     prefetch={false}
@@ -300,13 +329,13 @@ export default function Header({ userName, householdName, isOwner }: HeaderProps
                         width={40}
                         height={40}
                         alt="今日のごはん"
-                        className="object-contain max-h-full"
+                        style={{ width: "auto", height: "100%" }}
+                        className="object-contain"
                       />
                     </div>
                     <span className="text-gray-700 font-bold text-sm">今日のごはん</span>
                   </Link>
 
-                  {/* みんなのごはん */}
                   <Link
                     href="/family-summary"
                     prefetch={false}
@@ -319,13 +348,13 @@ export default function Header({ userName, householdName, isOwner }: HeaderProps
                         width={40}
                         height={40}
                         alt="みんなのごはん"
-                        className="object-contain max-h-full"
+                        style={{ width: "auto", height: "100%" }}
+                        className="object-contain"
                       />
                     </div>
                     <span className="text-gray-700 font-bold text-sm">みんなのごはん</span>
                   </Link>
 
-                  {/* プロフィール */}
                   <Link
                     href="/mypage/profile"
                     prefetch={false}
@@ -338,13 +367,13 @@ export default function Header({ userName, householdName, isOwner }: HeaderProps
                         width={40}
                         height={40}
                         alt="プロフィール"
-                        className="object-contain max-h-full"
+                        style={{ width: "auto", height: "100%" }}
+                        className="object-contain"
                       />
                     </div>
                     <span className="text-gray-700 font-bold text-sm">プロフィール</span>
                   </Link>
 
-                  {/* 【代表者限定】ごはん登録 */}
                   {isOwner && (
                     <Link
                       href="/menus"
@@ -358,14 +387,14 @@ export default function Header({ userName, householdName, isOwner }: HeaderProps
                           width={40}
                           height={40}
                           alt="ごはん登録"
-                          className="object-contain max-h-full"
+                          style={{ width: "auto", height: "100%" }}
+                          className="object-contain"
                         />
                       </div>
                       <span className="text-gray-700 font-bold text-sm">ごはん登録</span>
                     </Link>
                   )}
 
-                  {/* 【代表者限定】提案履歴 */}
                   {isOwner && (
                     <Link
                       href="/history"
@@ -379,14 +408,14 @@ export default function Header({ userName, householdName, isOwner }: HeaderProps
                           width={40}
                           height={40}
                           alt="提案履歴"
-                          className="object-contain max-h-full"
+                          style={{ width: "auto", height: "100%" }}
+                          className="object-contain"
                         />
                       </div>
                       <span className="text-gray-700 font-bold text-sm">提案履歴</span>
                     </Link>
                   )}
 
-                  {/* ログアウト */}
                   <button
                     type="button"
                     onClick={handleSignOut}
@@ -398,7 +427,8 @@ export default function Header({ userName, householdName, isOwner }: HeaderProps
                         width={40}
                         height={40}
                         alt="ログアウト"
-                        className="object-contain max-h-full"
+                        style={{ width: "auto", height: "100%" }}
+                        className="object-contain"
                       />
                     </div>
                     <span className="font-bold text-sm">ログアウト</span>
@@ -418,7 +448,8 @@ export default function Header({ userName, householdName, isOwner }: HeaderProps
                         width={40}
                         height={40}
                         alt="新規登録"
-                        className="object-contain max-h-full"
+                        style={{ width: "auto", height: "100%" }}
+                        className="object-contain"
                       />
                     </div>
                     <span className="text-gray-700 font-bold text-sm">新規登録</span>
@@ -435,7 +466,8 @@ export default function Header({ userName, householdName, isOwner }: HeaderProps
                         width={40}
                         height={40}
                         alt="ログイン"
-                        className="object-contain max-h-full"
+                        style={{ width: "auto", height: "100%" }}
+                        className="object-contain"
                       />
                     </div>
                     <span className="font-bold text-sm">ログイン</span>

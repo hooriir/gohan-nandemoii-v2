@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { prisma } from "@/lib/prisma";
+import { getJstDayRange } from "@/utils/date";
 
 export async function GET() {
   try {
@@ -21,14 +22,16 @@ export async function GET() {
       return NextResponse.json({ error: "世帯に所属していません。" }, { status: 400 });
     }
 
-    // 本日（00:00:00）以降の最新ログを取得
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    // 日本時間(JST)の本日 00:00:00 〜 23:59:59.999 の範囲を取得
+    const { start, end } = getJstDayRange();
 
     const todayLog = await prisma.dishShowLog.findFirst({
       where: {
         householdId: member.householdId,
-        createdAt: { gte: today },
+        createdAt: {
+          gte: start,
+          lte: end,
+        },
       },
       include: {
         dish: true,
@@ -46,9 +49,9 @@ export async function GET() {
       decided: true,
       dish: {
         id: todayLog.dishId,
-        name: todayLog.dish?.name || todayLog.keyword || "今日のごはん",
+        name: todayLog.dish?.name || "今日のごはん",
         imageUrl: todayLog.dish?.imageUrl || null,
-        reason: "家族みんなの希望から決定しました！",
+        reason: todayLog.keyword || "家族みんなの希望から決定しました！",
       },
     });
   } catch (error) {

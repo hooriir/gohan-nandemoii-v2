@@ -13,6 +13,7 @@ export default function MediateButton() {
     setError(null);
 
     try {
+      // AI調停APIを実行（API内でDishShowLogの保存まで自動で行われます）
       const response = await fetch("/api/recommend/mediate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -23,30 +24,12 @@ export default function MediateButton() {
         throw new Error(errData.error || "メニューの決定に失敗しました。");
       }
 
-      const data = await response.json();
-      const decidedDishName = data.dish?.name || data.dishName || "今日のごはん";
-      const decidedDishId = data.dish?.id || data.dishId || null;
-      const decidedReason = data.reason || "家族みんなの希望から決定しました！";
-
-      const saveLogRes = await fetch("/api/dish-show-log", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          dishId: decidedDishId,
-          dishName: decidedDishName,
-          reason: decidedReason,
-        }),
-      });
-
-      if (!saveLogRes.ok) {
-        const logErrData = await saveLogRes.json();
-        throw new Error(logErrData.error || "本日の決定ログの保存に失敗しました。");
-      }
-
+      // 決定完了後、キャッシュを更新してトップページへ遷移
       router.refresh();
       router.push("/");
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "予期せぬエラーが発生しました。";
+      const msg =
+        err instanceof Error ? err.message : "予期せぬエラーが発生しました。";
       setError(msg);
     } finally {
       setIsMediating(false);

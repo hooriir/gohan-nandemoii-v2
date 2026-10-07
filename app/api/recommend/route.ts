@@ -1,3 +1,4 @@
+import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { createClient } from "@/utils/supabase/server";
 import { GoogleGenAI, ThinkingLevel, Type } from "@google/genai";
@@ -5,7 +6,10 @@ import type { Dish, Tag } from "@prisma/client";
 
 const ai = new GoogleGenAI({});
 
-type DishWithTags = Dish & { tags: Tag[]; };
+type DishWithTags = Dish & { tags: Tag[] };
+
+// 指定したミリ秒だけ待機するユーティリティ関数
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export async function POST(request: Request) {
   try {
@@ -15,9 +19,9 @@ export async function POST(request: Request) {
     } = await supabase.auth.getUser();
 
     if (!user) {
-      return new Response(
-        JSON.stringify({ error: "認証が必要です。ログインしてください。" }),
-        { status: 401, headers: { "Content-Type": "application/json" } }
+      return NextResponse.json(
+        { error: "認証が必要です。ログインしてください。" },
+        { status: 401 }
       );
     }
 
@@ -29,15 +33,15 @@ export async function POST(request: Request) {
     });
 
     if (!member) {
-      return new Response(
-        JSON.stringify({ error: "世帯に所属していません。世帯を作成または参加してください。" }),
-        { status: 400, headers: { "Content-Type": "application/json" } }
+      return NextResponse.json(
+        { error: "世帯に所属していません。世帯を作成または参加してください。" },
+        { status: 400 }
       );
     }
 
     const householdId = member.householdId;
 
-    const body = await request.json();
+    const body = await request.json().catch(() => ({}));
     const { keyword, type = "WANT" } = body;
 
     const cleanKeyword = keyword?.trim() || "";
@@ -61,11 +65,11 @@ export async function POST(request: Request) {
     });
 
     if (householdDishes.length === 0) {
-      return new Response(
-        JSON.stringify({
+      return NextResponse.json(
+        {
           error: "登録されているメニューがありません。先にメニューを追加してください。",
-        }),
-        { status: 400, headers: { "Content-Type": "application/json" } }
+        },
+        { status: 400 }
       );
     }
 
@@ -121,16 +125,16 @@ export async function POST(request: Request) {
       targetDishes[Math.floor(Math.random() * targetDishes.length)];
 
     const prompt = `あなたは親しみやすくておしゃべりな専属シェフアシスタントです。
-      ユーザーの要望タイプ: 「${type}」
-      ユーザーのキーワード: 「${cleanKeyword || "なし"}」
-      今日選ばれた料理: 「${selectedDish.name}」
+ユーザーの要望タイプ: 「${type}」
+ユーザーのキーワード: 「${cleanKeyword || "なし"}」
+今日選ばれた料理: 「${selectedDish.name}」
 
-      ${
-        type === "NG"
-          ? `ユーザーが避けたい（NGな）キーワード「${cleanKeyword}」をうまく避けて、この「${selectedDish.name}」を選んだ理由や、この料理の魅力について、まるで友達や家族に話しかけるように温かみのあるトーンで120〜150文字程度で教えてください。`
-          : `この料理がユーザーの要望や今の気分にどうしてぴったりなのか、まるで友達や家族に話しかけるように、温かみのあるトーンで120〜150文字程度の少し長めの文章で「おすすめの理由」を教えてください。`
-      }
-      毎回、違った切り口やユーモアを交えて、新鮮味のあるコメントにしてください。`;
+${
+  type === "NG"
+    ? `ユーザーが避けたい（NGな）キーワード「${cleanKeyword}」をうまく避けて、この「${selectedDish.name}」を選んだ理由や、この料理の魅力について、まるで友達や家族に話しかけるように温かみのあるトーンで120〜150文字程度で教えてください。`
+    : `この料理がユーザーの要望や今の気分にどうしてぴったりなのか、まるで友達や家族に話しかけるように、温かみのあるトーンで120〜150文字程度の少し長めの文章で「おすすめの理由」を教えてください。`
+}
+毎回、違った切り口やユーモアを交えて、新鮮味のあるコメントにしてください。`;
 
     let isAiSuccess = false;
     const fallbackTemplates = [
@@ -142,32 +146,51 @@ export async function POST(request: Request) {
     ];
     let reasonText = fallbackTemplates[Math.floor(Math.random() * fallbackTemplates.length)];
 
-    try {
-      const response = await ai.models.generateContent({
-        model: "gemini-3.6-flash",
-        contents: prompt,
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              reason: { type: Type.STRING },
-            },
-            required: ["reason"],
-          },
-          thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
-        },
-      });
+    // リトライ設定（最大3回まで試行、1秒 → 2秒 → 4秒 と待機時間を倍増）
+    const maxRetries = 3;
+    let delay = 1000;
 
-      if (response.text) {
-        const parsed = JSON.parse(response.text);
-        if (parsed.reason) {
-          reasonText = parsed.reason;
-          isAiSuccess = true;
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const response = await ai.models.generateContent({
+          model: "gemini-3.6-flash",
+          contents: prompt,
+          config: {
+            responseMimeType: "application/json",
+            responseSchema: {
+              type: Type.OBJECT,
+              properties: {
+                reason: { type: Type.STRING },
+              },
+              required: ["reason"],
+            },
+            thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
+          },
+        });
+
+        if (response.text) {
+          const parsed = JSON.parse(response.text);
+          if (parsed.reason) {
+            reasonText = parsed.reason;
+            isAiSuccess = true;
+          }
+          // 成功した場合はループを抜ける
+          break;
         }
+      } catch (aiError) {
+        console.warn(
+          `Gemini Recommend API試行 [${attempt}/${maxRetries}] に失敗しました:`,
+          aiError
+        );
+
+        if (attempt === maxRetries) {
+          console.error("規定のリトライ回数を超えました。フォールバックメッセージを保存します。");
+          break;
+        }
+
+        await sleep(delay);
+        delay *= 2;
       }
-    } catch (aiError) {
-      console.error("Gemini APIの理由生成に失敗しました:", aiError);
     }
 
     await prisma.dishShowLog.create({
@@ -178,26 +201,20 @@ export async function POST(request: Request) {
       },
     });
 
-    return new Response(
-      JSON.stringify({
-        dish: {
-          id: selectedDish.id,
-          name: selectedDish.name,
-          imageUrl: selectedDish.imageUrl || null,
-        },
-        reason: reasonText,
-        isAiGeneration: isAiSuccess,
-      }),
-      { headers: { "Content-Type": "application/json" } }
-    );
+    return NextResponse.json({
+      dish: {
+        id: selectedDish.id,
+        name: selectedDish.name,
+        imageUrl: selectedDish.imageUrl || null,
+      },
+      reason: reasonText,
+      isAiGeneration: isAiSuccess,
+    });
   } catch (error) {
     console.error("Recommend API Error:", error);
-    return new Response(
-      JSON.stringify({ error: "メニューの決定に失敗しました。" }),
-      {
-        status: 500,
-        headers: { "Content-Type": "application/json" },
-      }
+    return NextResponse.json(
+      { error: "メニューの決定に失敗しました。" },
+      { status: 500 }
     );
   }
 }

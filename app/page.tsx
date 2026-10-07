@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import Image from "next/image";
+import Link from "next/link";
 import Header from "@/components/Header";
 import { prisma } from "@/lib/prisma";
 import ResetButton from "@/components/ResetButton";
@@ -86,7 +87,7 @@ export default async function HomePage() {
 
             {todayLog.keyword && (
               <div className="bg-[#53cbfb] text-white p-4 rounded-2xl text-left text-sm shadow-inner mb-2">
-                <p className="font-bold text-xs uppercase tracking-wider mb-1">
+                <p className="font-bold text-xs tracking-wider mb-1">
                   AIごはんさん
                 </p>
                 <p className="leading-relaxed font-medium">
@@ -130,19 +131,19 @@ export default async function HomePage() {
             </p>
 
             <div className="w-full flex flex-col gap-3">
-              <a
+              <Link
                 href="/my-dish"
                 className="w-full py-3.5 bg-[#e60012] hover:bg-[#c4000f] text-white font-black rounded-full shadow-lg transition-transform active:scale-95 text-base text-center block"
               >
                 あなたのごはんを決める
-              </a>
+              </Link>
 
-              <a
+              <Link
                 href="/family-summary"
                 className="w-full py-3 bg-white border border-gray-200 text-gray-600 font-bold rounded-full shadow-sm hover:bg-gray-50 transition-all text-sm text-center block"
               >
                 みんなのごはんを見る
-              </a>
+              </Link>
             </div>
           </div>
         </div>
