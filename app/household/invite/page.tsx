@@ -101,6 +101,9 @@ export default function InvitePage() {
             >
               {copied ? "コピーしました！" : "招待コードをコピー"}
             </button>
+              <p className="text-xs text-gray-500 font-medium pt-1">
+                ※ 有効期限：7日間 ／ 最大5人まで使えます
+              </p>
           </div>
         )}
 
