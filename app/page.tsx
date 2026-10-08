@@ -10,16 +10,16 @@ import { getCurrentUserContext } from "@/lib/getCurrentUserContext";
 export const revalidate = 0; // 常に最新データを取得
 
 export default async function HomePage() {
-  // 1. サーバー側で認証・世帯文脈を取得（cache()によりリクエスト内1回実行）
+  // 1. サーバー側で認証・世帯文脈を取得
   const userContext = await getCurrentUserContext();
 
   // 未ログインの場合はログイン画面へ
-  if (!userContext) {
+  if (!userContext || !userContext.user) {
     redirect("/login");
   }
 
-  // 世帯未所属の場合は世帯作成へ
-  if (!userContext.householdName) {
+  // 世帯未所属（householdIdが存在しない）場合は世帯作成へ
+  if (!userContext.householdId) {
     redirect("/household/create");
   }
 
@@ -28,11 +28,7 @@ export default async function HomePage() {
 
   const todayLog = await prisma.dishShowLog.findFirst({
     where: {
-      household: {
-        members: {
-          some: { userId: userContext.user.id },
-        },
-      },
+      householdId: userContext.householdId,
       createdAt: {
         gte: start,
         lte: end,

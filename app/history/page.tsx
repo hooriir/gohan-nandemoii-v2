@@ -11,25 +11,20 @@ export default async function HistoryPage() {
   // 1. サーバー側で認証・世帯文脈を取得
   const userContext = await getCurrentUserContext();
 
-  if (!userContext) {
+  if (!userContext || !userContext.user) {
     redirect("/login");
   }
 
-  // 2. ユーザーの所属世帯を直接取得
-  const member = await prisma.householdMember.findFirst({
-    where: { userId: userContext.user.id },
-    select: { householdId: true },
-  });
-
-  if (!member) {
+  // 世帯未所属の場合は世帯作成へ
+  if (!userContext.householdId) {
     redirect("/household/create");
   }
 
-  const { isOwner, userName, householdName } = userContext;
+  const { isOwner, userName, householdName, householdId } = userContext;
 
-  // 3. 履歴データの取得（件数制限 + 必要なカラムのみ抽出）
+  // 2. 履歴データの取得（無駄な世帯メンバー検索クエリを排除し、直接 householdId を指定）
   const logs = await prisma.dishShowLog.findMany({
-    where: { householdId: member.householdId },
+    where: { householdId },
     take: 50, // 性能低下を防ぐため直近50件に制限
     select: {
       id: true,

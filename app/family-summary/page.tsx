@@ -12,22 +12,16 @@ export default async function FamilySummaryPage() {
   // 1. サーバー側で認証・世帯文脈を取得
   const userContext = await getCurrentUserContext();
 
-  if (!userContext) {
+  if (!userContext || !userContext.user) {
     redirect("/login");
   }
 
-  // 2. 自分の所属世帯情報（householdId）を取得
-  const member = await prisma.householdMember.findFirst({
-    where: { userId: userContext.user.id },
-    select: { householdId: true },
-  });
-
-  if (!member) {
+  // 2. 世帯未所属の場合は世帯作成へ（クエリを削除し、householdId を直接使用）
+  if (!userContext.householdId) {
     redirect("/household/create");
   }
 
-  const householdId = member.householdId;
-  const { user, isOwner, userName, householdName } = userContext;
+  const { user, isOwner, userName, householdName, householdId } = userContext;
 
   // 3. 本日のJST範囲（start, end）と日付文字列（today）を取得
   const { start, end } = getJstDayRange();

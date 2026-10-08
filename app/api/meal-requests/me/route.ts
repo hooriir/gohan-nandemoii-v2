@@ -1,20 +1,37 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { prisma } from "@/lib/prisma";
-import { getJstDayRange } from "@/utils/date"; // 👈 getJstDayRange に変更
+import { getJstDayRange } from "@/utils/date";
+
+// ヘルパー: セッション/ユーザーを軽量・安全に取得（ConnectTimeoutError対策）
+async function getAuthUser() {
+  const supabase = await createClient();
+  const {
+    data: { session },
+    error: sessionError,
+  } = await supabase.auth.getSession();
+
+  if (!sessionError && session?.user) {
+    return session.user;
+  }
+
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+
+  if (userError || !user) return null;
+  return user;
+}
 
 // ==========================================
 // GET: ログインユーザー本人の本日の希望を取得
 // ==========================================
 export async function GET() {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
+    const user = await getAuthUser();
 
-    if (authError || !user) {
+    if (!user) {
       return NextResponse.json(
         { error: "認証されていません" },
         { status: 401 }

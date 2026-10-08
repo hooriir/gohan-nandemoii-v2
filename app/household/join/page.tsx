@@ -6,9 +6,14 @@ import JoinForm from "./JoinForm";
 export default async function JoinHouseholdPage() {
   const userContext = await getCurrentUserContext();
 
-  // 未ログインの場合はログイン画面へ
-  if (!userContext) {
+  // 1. 未ログインの場合はログイン画面へ
+  if (!userContext || !userContext.user) {
     redirect("/login");
+  }
+
+  // 2. すでに世帯に所属している（householdIdが存在する）場合はトップ画面へリダイレクト
+  if (userContext.householdId) {
+    redirect("/");
   }
 
   return (

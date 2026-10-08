@@ -3,18 +3,27 @@ import { prisma } from "@/lib/prisma";
 import { createClient } from "@/utils/supabase/server";
 import { getJstDateOnly, getJstDayRange } from "@/utils/date";
 
+// ヘルパー: セッション/ユーザーを軽量・安全に取得（ConnectTimeoutError対策）
+async function getAuthUser() {
+  const supabase = await createClient();
+  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+  if (!sessionError && session?.user) {
+    return session.user;
+  }
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  if (userError || !user) return null;
+  return user;
+}
+
 export async function GET() {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const user = await getAuthUser();
 
     if (!user) {
       return NextResponse.json({ error: "認証が必要です。" }, { status: 401 });
     }
 
-    const member = await prisma.householdMember.findUnique({
+    const member = await prisma.householdMember.findFirst({
       where: { userId: user.id },
     });
 
@@ -24,41 +33,45 @@ export async function GET() {
 
     const householdId = member.householdId;
 
-    const householdMembers = await prisma.householdMember.findMany({
-      where: { householdId },
-      include: {
-        user: {
-          select: {
-            id: true,
-            email: true,
-          },
-        },
-      },
-    });
-
-    // 日本時間の本日の範囲（00:00:00 〜 23:59:59）を取得
+    // 日本時間の本日の範囲を取得
     const { start, end } = getJstDayRange();
 
-    const memberIds = householdMembers.map((m) => m.userId);
-    const requests = await prisma.mealRequest.findMany({
-      where: {
-        userId: { in: memberIds },
-        requestDate: {
-          gte: start,
-          lte: end,
-        },
-      },
-      include: {
-        dish: {
-          select: {
-            name: true,
+    // メンバー一覧と希望一覧を並列取得で高速化
+    const [householdMembers, requests] = await Promise.all([
+      prisma.householdMember.findMany({
+        where: { householdId },
+        include: {
+          user: {
+            select: {
+              id: true,
+              email: true,
+            },
           },
         },
-      },
-    });
+      }),
+      prisma.mealRequest.findMany({
+        where: {
+          householdId,
+          requestDate: {
+            gte: start,
+            lte: end,
+          },
+        },
+        include: {
+          dish: {
+            select: {
+              name: true,
+            },
+          },
+        },
+      }),
+    ]);
+
+    // O(1) で高速アクセスできる Map 化
+    const requestMap = new Map(requests.map((r) => [r.userId, r]));
 
     const result = householdMembers.map((m) => {
-      const userRequest = requests.find((r) => r.userId === m.userId);
+      const userRequest = requestMap.get(m.userId);
       return {
         userId: m.userId,
         email: m.user.email,
@@ -84,16 +97,13 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const user = await getAuthUser();
 
     if (!user) {
       return NextResponse.json({ error: "認証が必要です。" }, { status: 401 });
     }
 
-    const member = await prisma.householdMember.findUnique({
+    const member = await prisma.householdMember.findFirst({
       where: { userId: user.id },
     });
 

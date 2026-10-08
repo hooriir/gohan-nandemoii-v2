@@ -6,12 +6,17 @@ import InviteForm from "./InviteForm";
 export default async function InvitePage() {
   const userContext = await getCurrentUserContext();
 
-  // 未ログインまたは世帯未作成の場合はリダイレクト
-  if (!userContext || !userContext.householdName) {
+  // 1. 未ログインの場合はログイン画面へ
+  if (!userContext || !userContext.user) {
     redirect("/login");
   }
 
-  // 代表者（オーナー）以外は招待ページに入れないようにガードする場合
+  // 2. 世帯未所属（householdIdが存在しない）場合は世帯作成ページへ
+  if (!userContext.householdId) {
+    redirect("/household/create");
+  }
+
+  // 3. 代表者（オーナー）以外は招待ページに入れないようにガード
   if (!userContext.isOwner) {
     redirect("/");
   }

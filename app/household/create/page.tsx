@@ -7,12 +7,12 @@ export default async function CreateHouseholdPage() {
   const userContext = await getCurrentUserContext();
 
   // 未ログインの場合はログイン画面へ
-  if (!userContext) {
+  if (!userContext || !userContext.user) {
     redirect("/login");
   }
 
-  // すでに世帯に所属している場合はトップ画面へリダイレクト（二重作成の防止）
-  if (userContext.householdName) {
+  // すでに世帯に所属している（householdIdが存在する）場合はトップ画面へリダイレクト（二重作成の防止）
+  if (userContext.householdId) {
     redirect("/");
   }
 

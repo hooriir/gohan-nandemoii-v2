@@ -12,12 +12,30 @@ type DishWithTags = Dish & { tags: Tag[] };
 // 指定したミリ秒だけ待機するユーティリティ関数
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+// ヘルパー: セッション/ユーザーを軽量・安全に取得（ConnectTimeoutError対策）
+async function getAuthUser() {
+  const supabase = await createClient();
+  const {
+    data: { session },
+    error: sessionError,
+  } = await supabase.auth.getSession();
+
+  if (!sessionError && session?.user) {
+    return session.user;
+  }
+
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+
+  if (userError || !user) return null;
+  return user;
+}
+
 export async function POST(request: Request) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const user = await getAuthUser();
 
     if (!user) {
       return NextResponse.json(
@@ -26,7 +44,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const member = await prisma.householdMember.findUnique({
+    const member = await prisma.householdMember.findFirst({
       where: { userId: user.id },
     });
 
@@ -110,14 +128,17 @@ ${dishesSummary}
     let reasonText = `家族みんなの希望をバランスよく考えて、本日は「${selectedDish.name}」に決定しました！楽しく食べてくださいね！`;
     let isAiSuccess = false;
 
-    // リトライ設定（最大3回まで試行、1秒 → 2秒 → 4秒 と待機時間を倍増）
+    // モデル名はメンター指定の gemini-3.6-flash を指定
+    const modelName = process.env.GEMINI_MODEL_NAME || "gemini-3.6-flash";
+
+    // リトライ設定（初期待機を500msにして高速化）
     const maxRetries = 3;
-    let delay = 1000;
+    let delay = 500;
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         const response = await ai.models.generateContent({
-          model: "gemini-3.6-flash", // モデル名はそのまま
+          model: modelName,
           contents: prompt,
           config: {
             responseMimeType: "application/json",
@@ -162,13 +183,12 @@ ${dishesSummary}
           aiError
         );
 
-        // 最後の試行だった場合はループ終了（デフォルトメッセージをフォールバックとして使用）
         if (attempt === maxRetries) {
           console.error("規定のリトライ回数を超えました。デフォルトメッセージを保存します。");
           break;
         }
 
-        // 次のリトライまで待機（指数バックオフ）
+        // 次のリトライまで待機（指数バックオフ: 500ms -> 1000ms -> 2000ms）
         await sleep(delay);
         delay *= 2;
       }

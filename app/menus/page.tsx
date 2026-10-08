@@ -7,7 +7,7 @@ import { getCurrentUserContext } from "@/lib/getCurrentUserContext";
 export const revalidate = 0;
 
 export default async function MenusPage() {
-  // Server Component 用ヘルパーからユーザーコンテキストを取得
+  // 1. サーバー側でユーザーコンテキストを取得
   const userContext = await getCurrentUserContext();
 
   // 未ログインの場合はログインページへ
@@ -15,24 +15,14 @@ export default async function MenusPage() {
     redirect("/login");
   }
 
-  // 世帯に所属していない場合は世帯作成ページへ
-  if (!userContext.householdName) {
+  // 世帯に所属していない（householdIdが存在しない）場合は世帯作成ページへ
+  if (!userContext.householdId) {
     redirect("/household/create");
   }
 
-  // ユーザーの世帯所属情報を取得
-  const member = await prisma.householdMember.findFirst({
-    where: { userId: userContext.user.id },
-    select: { householdId: true },
-  });
-
-  if (!member) {
-    redirect("/household/create");
-  }
-
-  // 世帯IDに紐づく料理一覧を取得
+  // 2. ユーザーの世帯IDを直接利用して料理一覧を取得（重複クエリを削除）
   const dishes = await prisma.dish.findMany({
-    where: { householdId: member.householdId },
+    where: { householdId: userContext.householdId },
     include: { tags: true },
     orderBy: { createdAt: "desc" },
   });
