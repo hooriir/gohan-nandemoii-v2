@@ -135,7 +135,7 @@
 
 ```
 {
-  "inviteCode": "NEWCODE9876"
+  "success": true, "code": "A1B2C3D4"
 }
 
 ```
