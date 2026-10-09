@@ -132,14 +132,14 @@ export default function Header({
                     src="/images/ie.svg"
                     width={100}
                     height={100}
-                    alt="みんなのごはん"
+                    alt="みんなの希望"
                     style={{ width: "auto", height: "100%" }}
                     className="object-contain"
                     priority
                   />
                 </div>
                 <span className="text-gray-700 font-bold text-[10px] group-hover:text-brand-red transition-colors duration-200 text-center leading-tight">
-                  みんなのごはん
+                  みんなの希望
                 </span>
               </Link>
 
@@ -347,12 +347,12 @@ export default function Header({
                         src="/images/ie.svg"
                         width={40}
                         height={40}
-                        alt="みんなのごはん"
+                        alt="みんなの希望"
                         style={{ width: "auto", height: "100%" }}
                         className="object-contain"
                       />
                     </div>
-                    <span className="text-gray-700 font-bold text-sm">みんなのごはん</span>
+                    <span className="text-gray-700 font-bold text-sm">みんなの希望</span>
                   </Link>
 
                   <Link

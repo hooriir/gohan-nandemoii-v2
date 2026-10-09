@@ -5,6 +5,7 @@ import DeadlineMessageEditor from "@/components/family-summary/DeadlineMessageEd
 import MediateButton from "@/components/family-summary/MediateButton";
 import { getJstDayRange, getJstDateOnly } from "@/utils/date";
 import { getCurrentUserContext } from "@/lib/getCurrentUserContext";
+import Link from "next/link";
 
 export const revalidate = 0;
 
@@ -105,7 +106,7 @@ export default async function FamilySummaryPage() {
 
       <div className="w-full max-w-xl flex flex-col items-center mt-6">
         <h1 className="text-2xl md:text-3xl font-black mb-6 tracking-wider text-white">
-          みんなのごはん
+          みんなの希望
         </h1>
 
         {/* 家族の希望一覧カード */}
@@ -161,12 +162,12 @@ export default async function FamilySummaryPage() {
                     {/* 変更ボタン（自分の行のみ表示） */}
                     <div className="w-1/4 flex justify-end">
                       {isMe && (
-                        <a
-                          href="/my-dish"
+                        <Link
+                          href="/my-dish?open=true"
                           className="bg-[#54C7F3] hover:bg-[#3bbbe8] text-white font-bold text-xs px-3 py-1.5 rounded-lg shadow-sm transition-transform active:scale-95 block text-center"
                         >
                           変更する
-                        </a>
+                        </Link>
                       )}
                     </div>
                   </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 
 interface Dish {
@@ -28,11 +28,16 @@ export default function MyDishForm({
   userId,
 }: Props) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // ?open=true パラメータがあるか判定
+  const shouldOpen = searchParams.get("open") === "true";
 
   // フォーム用ステート
   const [myRequestType] = useState<"WANT" | "NG" | "ANY">("WANT");
   const [dishNameInput, setDishNameInput] = useState("");
-  const [isSelecting, setIsSelecting] = useState(false);
+  // ?open=true の場合は最初からフォームを開いた状態（true）にする
+  const [isSelecting, setIsSelecting] = useState(shouldOpen);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<RecommendResponse | null>(initialResult);
 
@@ -161,7 +166,7 @@ export default function MyDishForm({
     );
   }
 
-  /* 【3】「ごはんを決める！」「変更する」押下時：メニュー名入力フォーム */
+  /* 【3】「ごはんを決める！」「変更する」押下時、または ?open=true 時の入力フォーム */
   return (
     <div className="py-2">
       <h2 className="text-lg font-black text-gray-700 mb-4">

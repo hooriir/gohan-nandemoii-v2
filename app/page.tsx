@@ -128,7 +128,7 @@ export default async function HomePage() {
 
             <div className="w-full flex flex-col gap-3">
               <Link
-                href="/my-dish"
+                href="/my-dish?open=true"
                 className="w-full py-3.5 bg-[#e60012] hover:bg-[#c4000f] text-white font-black rounded-full shadow-lg transition-transform active:scale-95 text-base text-center block"
               >
                 あなたのごはんを決める
