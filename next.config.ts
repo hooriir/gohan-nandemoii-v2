@@ -8,12 +8,18 @@ const withPWA = withPWAInit({
 });
 
 const nextConfig: NextConfig = {
-  turbopack: {}, // ← これを追記します
+  turbopack: {},
   images: {
     remotePatterns: [
       {
         protocol: "https",
         hostname: "vhhzdrqwpprbdirkaqsm.supabase.co",
+        port: "",
+        pathname: "/storage/v1/object/public/**",
+      },
+      {
+        protocol: "https",
+        hostname: "ixxbpbulgxncyfqqtqsj.supabase.co",
         port: "",
         pathname: "/storage/v1/object/public/**",
       },
