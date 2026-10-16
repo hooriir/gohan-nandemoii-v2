@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic'
 import { redirect } from "next/navigation";
 import Header from "@/components/Header";
 import { getCurrentUserContext } from "@/lib/getCurrentUserContext";
