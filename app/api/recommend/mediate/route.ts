@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { createClient } from "@/utils/supabase/server";
 import { GoogleGenAI, ThinkingLevel, Type } from "@google/genai";
 import type { Dish, Tag } from "@prisma/client";
-import { getJstDayRange } from "@/utils/date";
+import { getJstDateOnly } from "@/utils/date";
 
 const ai = new GoogleGenAI({});
 
@@ -57,17 +57,14 @@ export async function POST(request: Request) {
 
     const householdId = member.householdId;
 
-    // 日本時間の本日範囲（00:00:00 〜 23:59:59）を取得
-    const { start, end } = getJstDayRange();
+    // 日本時間の本日日付文字列（YYYY-MM-DD）を取得
+    const today = getJstDateOnly();
 
     // 1. その世帯の「今日」の MealRequest（希望）を全員分取得
     const requests = await prisma.mealRequest.findMany({
       where: {
         householdId: householdId,
-        requestDate: {
-          gte: start,
-          lte: end,
-        },
+        requestDate: today,
       },
       include: {
         user: true,

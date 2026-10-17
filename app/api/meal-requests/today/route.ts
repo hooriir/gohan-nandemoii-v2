@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { createClient } from "@/utils/supabase/server";
-import { getJstDateOnly, getJstDayRange } from "@/utils/date";
+import { getJstDateOnly } from "@/utils/date";
 
 // ヘルパー: セッション/ユーザーを軽量・安全に取得（ConnectTimeoutError対策）
 async function getAuthUser() {
@@ -33,10 +33,10 @@ export async function GET() {
 
     const householdId = member.householdId;
 
-    // 日本時間の本日の範囲を取得
-    const { start, end } = getJstDayRange();
+    // 日本時間の本日日付文字列（YYYY-MM-DD）を取得
+    const today = getJstDateOnly();
 
-    // メンバー一覧と希望一覧を並列取得で高速化
+    // メンバー一覧と希望一覧を並列取得で高速化（範囲ではなく日付完全一致で取得）
     const [householdMembers, requests] = await Promise.all([
       prisma.householdMember.findMany({
         where: { householdId },
@@ -52,10 +52,7 @@ export async function GET() {
       prisma.mealRequest.findMany({
         where: {
           householdId,
-          requestDate: {
-            gte: start,
-            lte: end,
-          },
+          requestDate: today,
         },
         include: {
           dish: {
@@ -114,7 +111,7 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { type, keyword, dishId } = body;
 
-    // 日本時間の本日00:00:00の日付オブジェクト
+    // 日本時間の本日日付文字列（YYYY-MM-DD）
     const requestDate = getJstDateOnly();
 
     const mealRequest = await prisma.mealRequest.upsert({

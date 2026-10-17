@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { prisma } from "@/lib/prisma";
-import { getJstDayRange } from "@/utils/date";
+import { getJstDateOnly } from "@/utils/date";
 
 // ヘルパー: セッション/ユーザーを軽量・安全に取得（ConnectTimeoutError対策）
 async function getAuthUser() {
@@ -50,18 +50,14 @@ export async function GET() {
       );
     }
 
-    // 日本時間の本日の開始日時(00:00:00)と終了日時(23:59:59.999)を取得
-    const { start, end } = getJstDayRange();
+    // 日本時間の本日日付文字列（YYYY-MM-DD）を取得
+    const today = getJstDateOnly();
 
     const myRequest = await prisma.mealRequest.findFirst({
       where: {
         householdId: currentMember.householdId,
         userId: user.id,
-        // 本日中に限定して比較
-        requestDate: {
-          gte: start,
-          lte: end,
-        },
+        requestDate: today,
       },
       select: {
         id: true,

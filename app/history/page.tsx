@@ -109,6 +109,7 @@ export default async function HistoryPage() {
 
                     <div className="text-right text-[10px] sm:text-xs text-slate-400 whitespace-nowrap">
                       {new Date(log.createdAt).toLocaleDateString("ja-JP", {
+                        timeZone: "Asia/Tokyo",
                         month: "short",
                         day: "numeric",
                         hour: "2-digit",
