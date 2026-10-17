@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import { leaveHousehold } from "@/app/mypage/profile/actions";
+import { leaveHousehold, deleteAccount } from "@/app/mypage/profile/actions";
 
 interface ProfileFormProps {
   initialData: {
@@ -19,6 +19,7 @@ export default function ProfileForm({ initialData }: ProfileFormProps) {
   const [isPending, startTransition] = useTransition();
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  // 世帯脱退ハンドラー
   const handleLeaveHousehold = () => {
     setErrorMessage(null);
     if (!confirm(`本当に「${initialData.householdName}」から脱退しますか？`)) {
@@ -27,6 +28,22 @@ export default function ProfileForm({ initialData }: ProfileFormProps) {
 
     startTransition(async () => {
       const res = await leaveHousehold();
+      if (res?.error) {
+        setErrorMessage(res.error);
+      }
+    });
+  };
+
+  // アカウント削除ハンドラー
+  const handleDeleteAccount = () => {
+    setErrorMessage(null);
+    const confirmed = window.confirm(
+      "本当にアカウントを削除しますか？\n削除すると、これまでのすべてのデータが完全に削除され、元に戻すことはできません。"
+    );
+    if (!confirmed) return;
+
+    startTransition(async () => {
+      const res = await deleteAccount();
       if (res?.error) {
         setErrorMessage(res.error);
       }
@@ -89,7 +106,7 @@ export default function ProfileForm({ initialData }: ProfileFormProps) {
                 onClick={handleLeaveHousehold}
                 className="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 font-bold text-xs px-3 py-2 rounded-xl transition-colors disabled:opacity-50"
               >
-                {isPending ? "脱退中..." : "世帯から脱退する"}
+                {isPending ? "処理中..." : "世帯から脱退する"}
               </button>
             </div>
 
@@ -106,6 +123,21 @@ export default function ProfileForm({ initialData }: ProfileFormProps) {
             )}
           </div>
         )}
+
+        {/* アカウント削除（退会）エリア */}
+        <div className="mt-8 pt-6 border-t border-slate-100 flex flex-col items-center space-y-2">
+          <p className="text-[11px] font-bold text-gray-400">
+            アカウントを完全に削除します
+          </p>
+          <button
+            type="button"
+            disabled={isPending}
+            onClick={handleDeleteAccount}
+            className="text-rose-500 hover:text-rose-700 font-bold text-xs underline transition-colors disabled:opacity-50"
+          >
+            {isPending ? "アカウント削除中..." : "アカウントを削除する"}
+          </button>
+        </div>
       </div>
     </div>
   );
