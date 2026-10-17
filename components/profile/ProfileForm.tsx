@@ -38,7 +38,7 @@ export default function ProfileForm({ initialData }: ProfileFormProps) {
   const handleDeleteAccount = () => {
     setErrorMessage(null);
     const confirmed = window.confirm(
-      "本当にアカウントを削除しますか？\n削除すると、これまでのすべてのデータが完全に削除され、元に戻すことはできません。"
+      "本当にアカウントを削除しますか？\nすべてのデータが完全に削除され、元に戻すことはできません。"
     );
     if (!confirmed) return;
 

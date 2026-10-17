@@ -36,7 +36,7 @@ export async function leaveHousehold() {
   if (member.role === "OWNER" && member.household.members.length > 1) {
     return {
       error:
-        "オーナーは他のメンバーがいる状態では脱退できません。別のメンバーに譲渡するか、メンバーを削除してください。",
+        "世帯主はメンバー全員が脱退してから脱退することができます。",
     };
   }
 
@@ -86,7 +86,7 @@ export async function deleteAccount() {
     if (member.role === "OWNER" && member.household.members.length > 1) {
       return {
         error:
-          "世帯のオーナーは他のメンバーがいる状態では削除できません。メンバー全員が脱退してからアカウント削除してください。",
+          "世帯主は他のメンバー全員が脱退してからアカウント削除してください。",
       };
     }
 
