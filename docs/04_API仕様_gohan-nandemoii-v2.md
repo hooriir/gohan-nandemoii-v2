@@ -191,36 +191,9 @@
 
 ### 3.3 食事リクエスト管理 (`/api/meal-requests`)
 
-#### 3.3.1 リクエスト一覧取得
+#### 3.3.1 リクエスト作成 / 更新
 
-- **エンドポイント**: `GET /api/meal-requests`
-
-- **権限**: `Household Member`
-
-##### レスポンス (`200 OK`)
-
-```
-[
-  {
-    "id": "req-101",
-    "userId": "550e8400-e29b-41d4-a716-446655440000",
-    "dishId": "71a2d1b8-3e4f-4d2a-928d-123456789abc",
-    "comment": "久々に食べたい！",
-    "createdAt": "2026-09-23T10:00:00.000Z",
-    "user": {
-      "name": "山田太郎"
-    },
-    "dish": {
-      "name": "ハンバーグ"
-    }
-  }
-]
-
-```
-
-#### 3.3.2 リクエスト作成
-
-- **エンドポイント**: `POST /api/meal-requests`
+- **エンドポイント**: `POST /api/meal-requests` （または `POST /api/meal-requests/today`）
 
 - **権限**: `Household Member`
 
@@ -246,27 +219,7 @@
 
 ```
 
-#### 3.3.3 自分のリクエスト取得
-
-- **エンドポイント**: `GET /api/meal-requests/me`
-
-- **権限**: `Household Member`
-
-##### レスポンス (`200 OK`)
-
-```
-[
-  {
-    "id": "req-102",
-    "dishId": "71a2d1b8-3e4f-4d2a-928d-123456789abc",
-    "comment": "今夜のおかずにどうかな？",
-    "createdAt": "2026-09-23T11:00:00.000Z"
-  }
-]
-
-```
-
-#### 3.3.4 今日のリクエスト取得
+#### 3.3.2 今日のリクエスト取得
 
 - **エンドポイント**: `GET /api/meal-requests/today`
 
