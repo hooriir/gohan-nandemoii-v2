@@ -123,27 +123,6 @@ export default function Header({
               </Link>
 
               <Link
-                href="/family-summary"
-                prefetch={false}
-                className="group bg-white rounded-2xl p-2 w-20 h-20 flex flex-col items-center justify-center shadow-md hover:scale-105 transition-transform duration-200 shrink-0"
-              >
-                <div className="w-8 h-8 mb-1 flex items-center justify-center">
-                  <Image
-                    src="/images/ie.svg"
-                    width={100}
-                    height={100}
-                    alt="みんなの希望"
-                    style={{ width: "auto", height: "100%" }}
-                    className="object-contain"
-                    priority
-                  />
-                </div>
-                <span className="text-gray-700 font-bold text-[10px] group-hover:text-brand-red transition-colors duration-200 text-center leading-tight">
-                  みんなの希望
-                </span>
-              </Link>
-
-              <Link
                 href="/mypage/profile"
                 prefetch={false}
                 className="group bg-white rounded-2xl p-2 w-20 h-20 flex flex-col items-center justify-center shadow-md hover:scale-105 transition-transform duration-200 shrink-0"

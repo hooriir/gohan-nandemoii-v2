@@ -113,13 +113,6 @@ export default function MyDishForm({
 
         <div className="w-full max-w-sm flex flex-col gap-3">
           <button
-            onClick={() => router.push("/family-summary")}
-            className="w-full py-3 bg-[#e60012] hover:bg-[#c4000f] text-white font-black rounded-full shadow-md transition-all active:scale-95 text-sm"
-          >
-            みんなのごはんを見る
-          </button>
-
-          <button
             onClick={() => setIsSelecting(true)}
             className="w-full py-2.5 bg-[#53cbfb] hover:bg-sky-400 text-white font-bold rounded-full transition-all text-sm"
           >
@@ -153,13 +146,6 @@ export default function MyDishForm({
             className="w-full py-3.5 bg-[#e60012] hover:bg-[#c4000f] text-white font-black rounded-full shadow-md transition-transform active:scale-95 text-base tracking-wide"
           >
             ごはんを決める！
-          </button>
-
-          <button
-            onClick={() => router.push("/family-summary")}
-            className="w-full py-2.5 bg-white border-2 border-[#53cbfb] text-[#53cbfb] font-bold rounded-full hover:bg-sky-50 transition-all text-sm"
-          >
-            みんなのごはんを見る
           </button>
         </div>
       </div>

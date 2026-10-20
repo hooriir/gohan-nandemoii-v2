@@ -59,7 +59,7 @@ export default async function HomePage() {
         <Header {...headerProps} />
 
         <div className="w-full max-w-xl flex flex-col items-center mt-6">
-          <h1 className="text-xl md:text-2xl font-black mb-6 tracking-wider">
+          <h1 className="text-2xl md:text-3xl font-black mb-6 tracking-wider">
             今日のごはん
           </h1>
 
@@ -164,7 +164,7 @@ export default async function HomePage() {
 
       <div className="w-full max-w-xl flex flex-col items-center mt-6">
         <h1 className="text-2xl md:text-3xl font-black mb-6 tracking-wider text-white">
-          みんなの希望
+          今日の気分は？
         </h1>
 
         {/* 家族の希望一覧カード */}
