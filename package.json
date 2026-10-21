@@ -3,11 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "test": "vitest",
-    "dev": "next dev",
-    "build": "prisma generate && next build",
+    "dev": "next dev --turbopack",
+    "build": "npm install --legacy-peer-deps && next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "next lint",
+    "test": "vitest"
   },
   "dependencies": {
     "@ducanh2912/next-pwa": "^10.2.9",
