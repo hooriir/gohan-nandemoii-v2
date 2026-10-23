@@ -316,25 +316,6 @@ export default function Header({
                   </Link>
 
                   <Link
-                    href="/family-summary"
-                    prefetch={false}
-                    onClick={closeMenu}
-                    className="bg-white rounded-2xl px-4 py-3 flex items-center gap-4 shadow-sm hover:bg-gray-50 transition-colors"
-                  >
-                    <div className="w-7 h-7 shrink-0 flex items-center justify-center">
-                      <Image
-                        src="/images/ie.svg"
-                        width={40}
-                        height={40}
-                        alt="みんなの希望"
-                        style={{ width: "auto", height: "100%" }}
-                        className="object-contain"
-                      />
-                    </div>
-                    <span className="text-gray-700 font-bold text-sm">みんなの希望</span>
-                  </Link>
-
-                  <Link
                     href="/mypage/profile"
                     prefetch={false}
                     onClick={closeMenu}
