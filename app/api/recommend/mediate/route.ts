@@ -177,12 +177,9 @@ ${dishesSummary}
     let reasonText = `家族みんなの希望をバランスよく考えて、本日は「${selectedDish.name}」に決定しました！楽しく食べてくださいね！`;
     let isAiSuccess = false;
 
-    // モデル名はメンター指定の gemini-3.6-flash を指定
     const modelName = process.env.GEMINI_MODEL_NAME || "gemini-3.6-flash";
-
-    // リトライ設定（初期待機を500msにして高速化）
     const maxRetries = 3;
-    let delay = 500;
+    let delay = 300;
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
@@ -223,7 +220,6 @@ ${dishesSummary}
             reasonText = parsed.reason;
             isAiSuccess = true;
           }
-          // 成功した場合はループを抜ける
           break;
         }
       } catch (aiError) {
