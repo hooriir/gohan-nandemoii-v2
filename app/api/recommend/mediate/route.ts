@@ -92,7 +92,59 @@ export async function POST(request: Request) {
       );
     }
 
-    // 3. Geminiへのプロンプト作成
+    // ==========================================
+    // 2.5. 直近1週間の履歴除外 & NG除外のフィルタリング
+    // ==========================================
+
+    // A. 過去7日以内の提案履歴（DishShowLog）を取得
+    const oneWeekAgo = new Date();
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+
+    const recentLogs = await prisma.dishShowLog.findMany({
+      where: {
+        householdId: householdId,
+        createdAt: {
+          gte: oneWeekAgo,
+        },
+      },
+      select: { dishId: true },
+    });
+    const recentDishIds = new Set(recentLogs.map((log) => log.dishId));
+
+    // B. メンバーのNG希望を抽出
+    const ngDishIds = new Set<string>();
+    const ngKeywords = new Set<string>();
+
+    requests.forEach((r) => {
+      if (r.type === "NG") {
+        if (r.dishId) ngDishIds.add(r.dishId);
+        if (r.keyword) ngKeywords.add(r.keyword.trim());
+      }
+    });
+
+    // C. 候補から「1週間以内に行ったメニュー」と「NGメニュー」を除外
+    const availableDishes = householdDishes.filter((dish) => {
+      // 1週間以内なら除外
+      if (recentDishIds.has(dish.id)) return false;
+
+      // NG（ID一致、またはメニュー名一致）なら除外
+      if (ngDishIds.has(dish.id)) return false;
+      if (ngKeywords.has(dish.name)) return false;
+
+      return true;
+    });
+
+    // D. 有効な候補が0件の場合のハンドリング（UT-24対応）
+    if (availableDishes.length === 0) {
+      return NextResponse.json(
+        { error: "条件に一致する有効なメニュー候補がありません（全メニューがNGまたは1週間以内に提案済みです）。" },
+        { status: 400 }
+      );
+    }
+
+    // ==========================================
+    // 3. Geminiへのプロンプト作成（絞り込み済みの availableDishes を使用）
+    // ==========================================
     const requestsSummary = requests
       .map((r) => {
         const userName = r.user.name || "家族の誰か";
@@ -106,22 +158,22 @@ export async function POST(request: Request) {
       })
       .join("\n");
 
-    const dishesSummary = householdDishes
+    const dishesSummary = availableDishes
       .map((d) => `- ${d.name} (タグ: ${d.tags.map((t) => t.name).join(", ")})`)
       .join("\n");
 
     const prompt = `あなたは親しみやすくておしゃべりな専属シェフアシスタントです。
-以下の「家族の今日の希望」と「登録されているメニュー一覧」をすべて考慮し、今日作るべき料理をメニュー一覧の中から1つ選んでください。
+以下の「家族の今日の希望」と「利用可能なメニュー一覧（直近の履歴やNGを除外済み）」をすべて考慮し、今日作るべき料理をメニュー一覧の中から1つ選んでください。
 
 【家族の希望一覧】
 ${requestsSummary}
 
-【メニュー一覧】
+【利用可能なメニュー一覧】
 ${dishesSummary}
 
-家族全員の意見（WANTやNG）を上手に汲み取り、なぜその料理に決めたのかの理由を、まるで友達や家族に話しかけるように温かみのあるトーンで120〜150文字程度で教えてください。`;
+家族全員の意見（WANTなど）を上手に汲み取り、なぜその料理に決めたのかの理由を、まるで友達や家族に話しかけるように温かみのあるトーンで120〜150文字程度で教えてください。`;
 
-    let selectedDish: DishWithTags = householdDishes[0];
+    let selectedDish: DishWithTags = availableDishes[0];
     let reasonText = `家族みんなの希望をバランスよく考えて、本日は「${selectedDish.name}」に決定しました！楽しく食べてくださいね！`;
     let isAiSuccess = false;
 
@@ -160,7 +212,7 @@ ${dishesSummary}
         if (response.text) {
           const parsed = JSON.parse(response.text);
           if (parsed.matchedDishName) {
-            const found = householdDishes.find(
+            const found = availableDishes.find(
               (d) => d.name === parsed.matchedDishName
             );
             if (found) {
