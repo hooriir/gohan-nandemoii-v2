@@ -1,5 +1,6 @@
 import "./globals.css";
 import type { Metadata, Viewport } from "next";
+import ClientProviders from "@/components/ClientProviders";
 
 export const metadata: Metadata = {
   title: "ごはん？なんでもいい〜",
@@ -21,7 +22,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
-  userScalable: false, // スマホアプリっぽくピンチイン・アウト（拡大縮小）を無効化
+  userScalable: false,
 };
 
 export default function RootLayout({
@@ -32,7 +33,10 @@ export default function RootLayout({
   return (
     <html lang="ja" suppressHydrationWarning>
       <body className="bg-[#54C7F3] min-h-screen antialiased overflow-y-scroll overflow-x-hidden">
-        {children}
+        {/* クライアント側でタイマーを動かすためのプロバイダー */}
+        <ClientProviders>
+          {children}
+        </ClientProviders>
       </body>
     </html>
   );
